@@ -30,8 +30,9 @@ import { DiffedSentence, ErrorChips } from '../components/GradeDiff'
 import { useToast } from '../components/Toast'
 import Waveform from '../components/Waveform'
 import type {
-  AzureFeedback,
   Material,
+  PronunciationFeedback,
+  PronunciationProvider,
   Recording,
   RecordingFeedback,
   Sentence
@@ -41,21 +42,42 @@ import { errorMessage, formatDate } from '../utils'
 const ORIGINAL_COLOR = '#3987e5'
 const USER_COLOR = '#d95926'
 
-const AZURE_ERROR_LABELS: Record<string, string> = {
+const ERROR_LABELS: Record<string, string> = {
   Mispronunciation: '发音错误',
   Omission: '漏读',
   Insertion: '多读'
 }
 
-function formatAzureScore(value: number | null | undefined): string {
+const PROVIDER_LABELS: Record<PronunciationProvider, string> = {
+  tencent: '腾讯云智聆',
+  azure: 'Microsoft Azure'
+}
+
+const PROVIDER_SHORT: Record<PronunciationProvider, string> = {
+  tencent: '腾讯云',
+  azure: 'Azure'
+}
+
+function formatScore(value: number | null | undefined): string {
   return value === null || value === undefined ? '—' : String(Math.round(value))
 }
 
-function azureScoreClass(value: number | null | undefined): string {
+function scoreClass(value: number | null | undefined): string {
   if (value === null || value === undefined || !Number.isFinite(value)) return ''
   if (value >= 80) return 'score-good'
   if (value >= 60) return 'score-fair'
   return 'score-weak'
+}
+
+function pronunciationOf(recording: Recording): PronunciationFeedback | null {
+  return recording.pronunciation ?? recording.azure ?? null
+}
+
+function pronunciationSummary(recording: Recording): string {
+  const result = pronunciationOf(recording)
+  if (!result || result.pron_score === null) return ''
+  const provider = result.provider === 'tencent' ? '腾讯云' : 'Azure'
+  return ` · ${provider} ${Math.round(result.pron_score)}`
 }
 
 function computePeaks(buffer: AudioBuffer, buckets = 180): number[] {
@@ -109,9 +131,12 @@ export default function ShadowingPage(): ReactElement {
   const [speed, setSpeed] = useState(1)
   const [analyzing, setAnalyzing] = useState(false)
   const [feedback, setFeedback] = useState<RecordingFeedback | null>(null)
-  const [azureResult, setAzureResult] = useState<AzureFeedback | null>(null)
-  const [azureScoring, setAzureScoring] = useState(false)
-  const [azureConfigured, setAzureConfigured] = useState(false)
+  const [pronunciationResult, setPronunciationResult] =
+    useState<PronunciationFeedback | null>(null)
+  const [pronunciationScoring, setPronunciationScoring] = useState(false)
+  const [pronunciationConfigured, setPronunciationConfigured] = useState(false)
+  const [pronunciationProvider, setPronunciationProvider] =
+    useState<PronunciationProvider | null>(null)
   const [micError, setMicError] = useState<string | null>(null)
   const [audioError, setAudioError] = useState<string | null>(null)
 
@@ -145,13 +170,31 @@ export default function ShadowingPage(): ReactElement {
     () => recordings.find((recording) => recording.id === selectedId) ?? null,
     [recordings, selectedId]
   )
-  const busy = recordingState !== 'idle' || analyzing || azureScoring
+  const busy = recordingState !== 'idle' || analyzing || pronunciationScoring
+  // The action button follows the configured provider; a stored result keeps
+  // the provider that actually produced it.
+  const actionProviderLabel = pronunciationProvider
+    ? PROVIDER_LABELS[pronunciationProvider]
+    : '在线'
+  const actionProviderShort = pronunciationProvider
+    ? PROVIDER_SHORT[pronunciationProvider]
+    : '在线'
+  const resultProvider = pronunciationResult?.provider ?? pronunciationProvider
+  const resultProviderLabel = resultProvider
+    ? PROVIDER_LABELS[resultProvider]
+    : '在线'
+  const resultProviderShort = resultProvider
+    ? PROVIDER_SHORT[resultProvider]
+    : '在线'
   const maxDuration = Math.max(originalDuration, userDuration, 0.1)
 
   useEffect(() => {
     api
       .settings()
-      .then((settings) => setAzureConfigured(settings.azure_configured))
+      .then((settings) => {
+        setPronunciationConfigured(settings.pronunciation_configured)
+        setPronunciationProvider(settings.pronunciation_provider)
+      })
       .catch(() => undefined)
   }, [])
 
@@ -189,7 +232,7 @@ export default function ShadowingPage(): ReactElement {
     setRecordings([])
     setSelectedId(null)
     setFeedback(null)
-    setAzureResult(null)
+    setPronunciationResult(null)
     setMicError(null)
     setAudioError(null)
     api
@@ -199,7 +242,7 @@ export default function ShadowingPage(): ReactElement {
         setRecordings(items)
         setSelectedId(items[0]?.id ?? null)
         setFeedback(items[0]?.feedback ?? null)
-        setAzureResult(items[0]?.azure ?? null)
+        setPronunciationResult(items[0] ? pronunciationOf(items[0]) : null)
       })
       .catch(() => undefined)
     return () => {
@@ -466,7 +509,7 @@ export default function ShadowingPage(): ReactElement {
       setRecordings((previous) => [recording, ...previous])
       setSelectedId(recording.id)
       setFeedback(recording.feedback)
-      setAzureResult(recording.azure)
+      setPronunciationResult(pronunciationOf(recording))
       push('跟读录音已保存', 'success')
     } catch (error) {
       push(errorMessage(error), 'error')
@@ -523,7 +566,7 @@ export default function ShadowingPage(): ReactElement {
     stopBoth()
     setSelectedId(recording.id)
     setFeedback(recording.feedback)
-    setAzureResult(recording.azure)
+    setPronunciationResult(pronunciationOf(recording))
     setAudioError(null)
   }
 
@@ -537,7 +580,7 @@ export default function ShadowingPage(): ReactElement {
         const next = remaining[0] ?? null
         setSelectedId(next?.id ?? null)
         setFeedback(next?.feedback ?? null)
-        setAzureResult(next?.azure ?? null)
+        setPronunciationResult(next ? pronunciationOf(next) : null)
       }
       push('已删除录音', 'success')
     } catch (error) {
@@ -571,36 +614,45 @@ export default function ShadowingPage(): ReactElement {
     }
   }
 
-  const scoreWithAzure = async (): Promise<void> => {
+  const scorePronunciation = async (): Promise<void> => {
     if (!selectedRecording || busy) return
-    if (!azureConfigured) {
-      push('请先在设置页配置 Azure Speech 密钥和区域', 'info')
+    if (!pronunciationConfigured) {
+      push('请先在设置页配置腾讯云智聆或 Azure 的评测凭据', 'info')
       return
     }
+    const providerLabel = pronunciationProvider
+      ? PROVIDER_LABELS[pronunciationProvider]
+      : '所选服务'
     if (
       !window.confirm(
-        'Azure 评分会把这条录音发送到 Microsoft 云端，是否继续？'
+        `发音评分会把这条录音发送到 ${providerLabel} 云端，是否继续？`
       )
     ) {
       return
     }
-    setAzureScoring(true)
+    setPronunciationScoring(true)
     setAudioError(null)
     try {
-      const result = await api.azureScoreRecording(selectedRecording.id)
-      setAzureResult(result)
+      const result = await api.pronunciationScoreRecording(
+        selectedRecording.id
+      )
+      setPronunciationResult(result)
       setRecordings((previous) =>
         previous.map((recording) =>
           recording.id === selectedRecording.id
-            ? { ...recording, azure: result }
+            ? {
+                ...recording,
+                pronunciation: result,
+                azure: result
+              }
             : recording
         )
       )
-      push('Azure 音素评分完成', 'success')
+      push('音素评分完成', 'success')
     } catch (error) {
       push(errorMessage(error), 'error')
     } finally {
-      setAzureScoring(false)
+      setPronunciationScoring(false)
     }
   }
 
@@ -750,7 +802,7 @@ export default function ShadowingPage(): ReactElement {
                 ? stopRecording()
                 : void startRecording()
             }
-            disabled={recordingState === 'uploading' || analyzing || azureScoring}
+            disabled={recordingState === 'uploading' || analyzing || pronunciationScoring}
             title={recordingState === 'recording' ? '停止录音' : '开始录音'}
           >
             {recordingState === 'uploading' ? (
@@ -878,22 +930,24 @@ export default function ShadowingPage(): ReactElement {
                 )}
                 {analyzing ? '识别中…' : '本地评测'}
               </button>
-              {azureConfigured ? (
+              {pronunciationConfigured ? (
                 <button
                   className="btn btn-small"
-                  onClick={() => void scoreWithAzure()}
+                  onClick={() => void scorePronunciation()}
                   disabled={!selectedRecording || busy}
                 >
-                  {azureScoring ? (
+                  {pronunciationScoring ? (
                     <Loader2 size={14} className="spin" />
                   ) : (
                     <Cloud size={14} />
                   )}
-                  {azureScoring ? 'Azure 评分中…' : 'Azure 评分'}
+                  {pronunciationScoring
+                    ? `${actionProviderShort} 评分中…`
+                    : `${actionProviderShort} 评分`}
                 </button>
               ) : (
                 <Link className="btn btn-small" to="/settings">
-                  <Cloud size={14} /> 配置 Azure
+                  <Cloud size={14} /> 配置发音评测
                 </Link>
               )}
             </div>
@@ -923,9 +977,7 @@ export default function ShadowingPage(): ReactElement {
                       {recording.accuracy !== null
                         ? `识别准确率 ${Math.round(recording.accuracy * 100)}%`
                         : '未评测'}
-                      {recording.azure && recording.azure.pron_score !== null
-                        ? ` · Azure ${Math.round(recording.azure.pron_score)}`
-                        : ''}
+                      {pronunciationSummary(recording)}
                       {recording.id === selectedId ? ' · 已选中' : ''}
                     </span>
                   </div>
@@ -1004,43 +1056,50 @@ export default function ShadowingPage(): ReactElement {
       <section className="panel azure-score-card">
         <header className="section-head">
           <div>
-            <h2>Azure 音素级评分</h2>
-            <p>可选 · 录音会上传到 Microsoft Azure</p>
+            <h2>音素级发音评分</h2>
+            <p>
+              {pronunciationConfigured
+                ? `可选 · 录音会上传到 ${actionProviderLabel} 云端`
+                : '可选 · 需要先在设置页配置评测服务'}
+            </p>
           </div>
-          {azureResult ? (
-            <span className="azure-badge">AZURE</span>
+          {pronunciationResult ? (
+            <span className="azure-badge">
+              {resultProvider === 'azure' ? 'AZURE' : 'TENCENT'}
+            </span>
           ) : (
             <Link className="btn btn-small" to="/settings">
-              <Cloud size={14} /> 配置 Azure
+              <Cloud size={14} /> 配置发音评测
             </Link>
           )}
         </header>
 
-        {azureScoring ? (
+        {pronunciationScoring ? (
           <div className="azure-loading">
-            <Loader2 size={18} className="spin" /> 正在请求 Azure 发音评估…
+            <Loader2 size={18} className="spin" /> 正在请求{' '}
+            {actionProviderLabel} 发音评估…
           </div>
-        ) : azureResult ? (
+        ) : pronunciationResult ? (
           <div className="azure-result">
             <div className="azure-hero">
               <div className="azure-main-score">
-                <span>{formatAzureScore(azureResult.pron_score)}</span>
+                <span>{formatScore(pronunciationResult.pron_score)}</span>
                 <small>综合发音</small>
               </div>
               <div className="azure-sub-scores">
                 {(
                   [
-                    { label: '准确度', value: azureResult.accuracy_score },
-                    { label: '流利度', value: azureResult.fluency_score },
-                    { label: '完整度', value: azureResult.completeness_score },
-                    ...(azureResult.prosody_score !== null
-                      ? [{ label: '韵律', value: azureResult.prosody_score }]
+                    { label: '准确度', value: pronunciationResult.accuracy_score },
+                    { label: '流利度', value: pronunciationResult.fluency_score },
+                    { label: '完整度', value: pronunciationResult.completeness_score },
+                    ...(pronunciationResult.prosody_score !== null
+                      ? [{ label: '韵律', value: pronunciationResult.prosody_score }]
                       : [])
                   ] as Array<{ label: string; value: number | null }>
                 ).map((item) => (
                   <div className="azure-sub-score" key={item.label}>
-                    <span className={azureScoreClass(item.value)}>
-                      {formatAzureScore(item.value)}
+                    <span className={scoreClass(item.value)}>
+                      {formatScore(item.value)}
                     </span>
                     <small>{item.label}</small>
                   </div>
@@ -1049,46 +1108,46 @@ export default function ShadowingPage(): ReactElement {
             </div>
 
             <p className="azure-recognized">
-              <span className="diff-label">Azure 识别</span>
-              {azureResult.recognized_text || '—'}
+              <span className="diff-label">{resultProviderLabel} 识别</span>
+              {pronunciationResult.recognized_text || '—'}
             </p>
 
-            {azureResult.words.length > 0 ? (
+            {pronunciationResult.words.length > 0 ? (
               <div className="azure-words">
-                {azureResult.words.map((word, index) => (
+                {pronunciationResult.words.map((word, index) => (
                   <details
-                    className={`azure-word ${azureScoreClass(word.accuracy)}`}
+                    className={`azure-word ${scoreClass(word.accuracy)}`}
                     key={`${word.word}-${index}`}
                   >
                     <summary>
                       <span className="azure-word-text">{word.word}</span>
                       <span className="azure-word-score">
-                        {formatAzureScore(word.accuracy)}
+                        {formatScore(word.accuracy)}
                       </span>
                     </summary>
                     <div className="azure-word-body">
                       {word.error_type && word.error_type !== 'None' ? (
                         <span className="azure-error-tag">
-                          {AZURE_ERROR_LABELS[word.error_type] ?? word.error_type}
+                          {ERROR_LABELS[word.error_type] ?? word.error_type}
                         </span>
                       ) : null}
                       {word.phonemes.length > 0 ? (
                         <div className="azure-phonemes">
                           {word.phonemes.map((phoneme, phonemeIndex) => (
                             <span
-                              className={`phoneme-chip ${azureScoreClass(
+                              className={`phoneme-chip ${scoreClass(
                                 phoneme.score
                               )}`}
                               key={`${phoneme.phoneme}-${phonemeIndex}`}
                             >
                               <span>{phoneme.phoneme || '?'}</span>
-                              <b>{formatAzureScore(phoneme.score)}</b>
+                              <b>{formatScore(phoneme.score)}</b>
                             </span>
                           ))}
                         </div>
                       ) : (
                         <p className="azure-no-phonemes">
-                          Azure 没有返回这个单词的音素明细。
+                          {resultProviderShort} 没有返回这个单词的音素明细。
                         </p>
                       )}
                     </div>
@@ -1096,20 +1155,23 @@ export default function ShadowingPage(): ReactElement {
                 ))}
               </div>
             ) : (
-              <p className="azure-no-phonemes">Azure 没有返回词级明细。</p>
+              <p className="azure-no-phonemes">
+                {resultProviderShort} 没有返回词级明细。
+              </p>
             )}
 
             <p className="azure-note">
-              评分来自 Microsoft Azure · 区域 {azureResult.region} ·{' '}
-              {formatDate(azureResult.scored_at)}
+              {resultProvider === 'azure'
+                ? `评分来自 Microsoft Azure · 区域 ${pronunciationResult.region} · ${formatDate(pronunciationResult.scored_at)}`
+                : `评分来自腾讯云智聆 · ${formatDate(pronunciationResult.scored_at)}`}
             </p>
           </div>
         ) : (
           <div className="shadow-empty">
-            选中一条录音，点击上方「Azure 评分」查看音素级结果。
-            {azureConfigured
+            选中一条录音，点击上方「{actionProviderShort} 评分」查看音素级结果。
+            {pronunciationConfigured
               ? ''
-              : '需要先在设置页配置 Azure Speech 密钥和区域。'}
+              : '需要先在设置页配置腾讯云智聆或 Azure 的评测凭据。'}
           </div>
         )}
       </section>

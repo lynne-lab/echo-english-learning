@@ -221,29 +221,37 @@ export interface RecordingFeedback {
   rate_ratio: number
 }
 
-export interface AzurePhoneme {
+export type PronunciationProvider = 'tencent' | 'azure'
+
+export interface PronunciationPhoneme {
   phoneme: string
   score: number | null
 }
 
-export interface AzureWord {
+export interface PronunciationWord {
   word: string
   accuracy: number | null
   error_type: string | null
-  phonemes: AzurePhoneme[]
+  phonemes: PronunciationPhoneme[]
 }
 
-export interface AzureFeedback {
+export interface PronunciationFeedback {
+  provider?: PronunciationProvider | null
   recognized_text: string
   pron_score: number | null
   accuracy_score: number | null
   fluency_score: number | null
   completeness_score: number | null
   prosody_score: number | null
-  words: AzureWord[]
+  words: PronunciationWord[]
   region: string
   scored_at: string
 }
+
+// Kept for older imports; both names describe the same payload.
+export type AzurePhoneme = PronunciationPhoneme
+export type AzureWord = PronunciationWord
+export type AzureFeedback = PronunciationFeedback
 
 export interface Recording {
   id: string
@@ -255,7 +263,8 @@ export interface Recording {
   recognized_text: string | null
   accuracy: number | null
   feedback: RecordingFeedback | null
-  azure: AzureFeedback | null
+  pronunciation: PronunciationFeedback | null
+  azure: PronunciationFeedback | null
 }
 
 export interface StatsReviewStates {
@@ -340,6 +349,12 @@ export interface AppSettings {
   azure_configured: boolean
   azure_speech_region: string
   azure_key_masked: string | null
+  tencent_configured: boolean
+  tencent_app_id: string
+  tencent_secret_id_masked: string | null
+  tencent_secret_key_masked: string | null
+  pronunciation_provider: PronunciationProvider | null
+  pronunciation_configured: boolean
   models: WhisperModel[]
 }
 

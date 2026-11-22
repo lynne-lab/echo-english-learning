@@ -9,7 +9,7 @@ from typing import Any
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 
-from . import azure_speech, config, db
+from . import azure_speech, config, db, tencent_speech
 from .dictation_api import grade_text
 from .media import probe_media
 from .transcribe import transcribe_short_audio
@@ -78,12 +78,14 @@ def _payload(row: Any) -> dict[str, Any]:
             feedback = json.loads(row["feedback_json"])
         except (TypeError, ValueError):
             feedback = None
-    azure = None
+    pronunciation = None
     if row["azure_json"]:
         try:
-            azure = json.loads(row["azure_json"])
+            pronunciation = json.loads(row["azure_json"])
         except (TypeError, ValueError):
-            azure = None
+            pronunciation = None
+    if isinstance(pronunciation, dict) and not pronunciation.get("provider"):
+        pronunciation["provider"] = "azure"  # results stored before Tencent support
     return {
         "id": row["id"],
         "material_id": row["material_id"],
@@ -94,7 +96,9 @@ def _payload(row: Any) -> dict[str, Any]:
         "recognized_text": row["recognized_text"],
         "accuracy": row["accuracy"],
         "feedback": feedback,
-        "azure": azure,
+        # `azure` is kept as an alias so older builds still render the result.
+        "pronunciation": pronunciation,
+        "azure": pronunciation,
     }
 
 
@@ -314,8 +318,34 @@ def analyze_recording(recording_id: str) -> dict[str, Any]:
     return feedback
 
 
-@router.post("/recordings/{recording_id}/azure-score")
-def score_recording_with_azure(recording_id: str) -> dict[str, Any]:
+def _speech_credentials() -> tuple[str, dict[str, str]]:
+    """Pick the configured provider: Tencent first, then Azure."""
+    app_id = db.get_setting("tencent_speech_app_id", "") or ""
+    secret_id = db.get_setting("tencent_speech_secret_id", "") or ""
+    secret_key = db.get_setting("tencent_speech_secret_key", "") or ""
+    if app_id and secret_id and secret_key:
+        return (
+            "tencent",
+            {
+                "app_id": app_id,
+                "secret_id": secret_id,
+                "secret_key": secret_key,
+            },
+        )
+
+    azure_key = db.get_setting("azure_speech_key", "") or ""
+    azure_region = db.get_setting("azure_speech_region", "") or ""
+    if azure_key and azure_region:
+        return "azure", {"key": azure_key, "region": azure_region}
+
+    raise HTTPException(
+        status_code=400,
+        detail="请先在设置页配置腾讯云智聆或 Azure 的评测凭据",
+    )
+
+
+@router.post("/recordings/{recording_id}/pronunciation-score")
+def score_recording(recording_id: str) -> dict[str, Any]:
     with db.get_conn() as conn:
         row = conn.execute(
             "SELECT * FROM recordings WHERE id = ?", (recording_id,)
@@ -323,23 +353,22 @@ def score_recording_with_azure(recording_id: str) -> dict[str, Any]:
     if not row:
         raise HTTPException(status_code=404, detail="录音不存在")
 
-    key = db.get_setting("azure_speech_key", "") or ""
-    region = db.get_setting("azure_speech_region", "") or ""
-    if not key or not region:
-        raise HTTPException(
-            status_code=400,
-            detail="请先在设置页配置 Azure Speech 密钥和区域",
-        )
+    provider, credentials = _speech_credentials()
+    max_seconds = (
+        tencent_speech.MAX_AUDIO_SECONDS
+        if provider == "tencent"
+        else azure_speech.MAX_AUDIO_SECONDS
+    )
 
     sentence = db.get_sentence(row["sentence_id"])
     if not sentence:
         raise HTTPException(status_code=404, detail="原句已经不存在，无法评分")
 
     duration = float(row["duration"] or 0)
-    if duration > azure_speech.MAX_AUDIO_SECONDS + 0.5:
+    if duration > max_seconds + 0.5:
         raise HTTPException(
             status_code=400,
-            detail="Azure 发音评估最长支持 30 秒，请录制更短的片段",
+            detail=f"发音评估最长支持 {max_seconds} 秒，请录制更短的片段",
         )
 
     source = Path(row["file_path"])
@@ -349,10 +378,23 @@ def score_recording_with_azure(recording_id: str) -> dict[str, Any]:
     wav_path: Path | None = None
     try:
         wav_path = _convert_to_wav(source)
-        result = azure_speech.score_wav(
-            wav_path, sentence["text"], key, region
-        )
-    except azure_speech.AzureSpeechError as exc:
+        if provider == "tencent":
+            result = tencent_speech.score_wav(
+                wav_path,
+                sentence["text"],
+                credentials["app_id"],
+                credentials["secret_id"],
+                credentials["secret_key"],
+            )
+        else:
+            result = azure_speech.score_wav(
+                wav_path,
+                sentence["text"],
+                credentials["key"],
+                credentials["region"],
+            )
+            result["provider"] = "azure"
+    except (azure_speech.AzureSpeechError, tencent_speech.TencentSpeechError) as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
     except subprocess.CalledProcessError as exc:
         detail = exc.stderr.decode("utf-8", "replace")[:300] if exc.stderr else "转码失败"
@@ -377,3 +419,9 @@ def score_recording_with_azure(recording_id: str) -> dict[str, Any]:
             ),
         )
     return result
+
+
+@router.post("/recordings/{recording_id}/azure-score")
+def score_recording_with_azure(recording_id: str) -> dict[str, Any]:
+    """Backward-compatible alias for older renderer builds."""
+    return score_recording(recording_id)

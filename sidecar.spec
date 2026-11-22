@@ -65,6 +65,9 @@ hiddenimports += [
     "sidecar.app.srs",
     "sidecar.app.cuda",
     "sidecar.app.azure_speech",
+    "sidecar.app.tencent_speech",
+    "websockets.asyncio.client",
+    "websockets.legacy.client",
 ]
 
 a = Analysis(

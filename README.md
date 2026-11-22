@@ -2,7 +2,7 @@
 
 Windows 桌面英语听力/口语学习软件。把本地音视频或网页链接变成**可逐句精听**的时间轴字幕，点词查释义、带原声保存生词；用 **FSRS 间隔重复**复习生词，用**默写自动批改**检验听写，用**学习统计**看长期进步。
 
-当前版本：**v0.5.0 · 24 周学习计划**。
+当前版本：**v0.6.0 · 腾讯云智聆发音评测 + 24 周学习计划**。
 
 ## 已完成的功能
 
@@ -68,14 +68,26 @@ Windows 桌面英语听力/口语学习软件。把本地音视频或网页链�
 
 > 本地评测是**识别级反馈**，不是音素级发音评分；它能发现明显漏读和听不清，但不会像专业发音评测那样给出音素分数。
 
-### Azure 音素级发音评分（可选）
+### 音素级发音评分（可选，腾讯云智聆 / Azure）
+
+在线评分是可选功能，默认优先使用腾讯云智聆，也可以继续使用 Microsoft Azure。
+
+**腾讯云智聆（推荐）**
+
+- 在腾讯云控制台开通「智聆口语评测」，在「访问管理 → API 密钥管理」创建 SecretId/SecretKey，并记下账号 AppID
+- 在设置页填入 AppID、SecretId、SecretKey 后，跟读页会出现「腾讯云 评分」
+- 点击评分前会弹窗确认；确认后把当前录音发送到腾讯云进行句子/音素级评估
+- 结果包含：综合发音、准确度、流利度、完整度，以及单词和音素级分数、错误类型（发音错误/漏读/多读）
+- 录音最长 60 秒；凭据只保存在本机 SQLite 数据库，前端只显示末四位
+
+**Microsoft Azure（可选）**
 
 - 在设置页填入 Azure Speech 的**密钥**和**区域**（例如 `eastus`）后，跟读页会出现「Azure 评分」
-- 点击评分前会弹窗确认；确认后把当前录音发送到 Microsoft Azure 进行音素级评估
-- 结果包含：综合发音、准确度、流利度、完整度、韵律，以及单词和音素级分数、错误类型（发音错误/漏读/多读）
+- 字段与腾讯云一致，但录音最长 30 秒
+- 腾讯云和 Azure 都配置时优先使用腾讯云；需要改用 Azure 时先清除腾讯云配置
+
 - 只影响选中的那一次录音；未配置时完全不影响本地跟读评测和其他功能
-- 密钥只保存在本机 SQLite 数据库，前端只显示末四位；录音最长 30 秒
-- Azure 语音服务由 Microsoft 计费，请以自己的 Azure 订阅配额为准
+- 两个服务分别由腾讯云 / Microsoft 计费，请以你自己的配额为准
 
 ### 学习统计
 
@@ -148,8 +160,9 @@ sidecar/app/
   reviews_api.py   FSRS 复习队列、评分、预览
   plan_api.py      24 周学习计划、每日任务、完成度
   dictation_api.py 默写会话、diff 批改、记录
-  recordings_api.py 跟读录音上传、切片播放、本地评测、Azure 评分
+  recordings_api.py 跟读录音上传、切片播放、本地评测、在线发音评分
   azure_speech.py   Azure 发音评估 REST 适配与响应解析
+  tencent_speech.py 腾讯云智聆 SOE WebSocket 适配与响应解析
   stats_api.py     学习统计
   transcribe.py    转写、短音频识别、GPU/CPU 回退
   srs.py           FSRS 封装与到期时间归一化
@@ -185,6 +198,15 @@ npm run dev
 - 下载源默认使用 Hugging Face 镜像，可通过环境变量 `HF_ENDPOINT` 覆盖。
 - GPU 依赖安装后，sidecar 会自动注册 cuBLAS / cuDNN DLL 目录；CUDA 推理失败会回退 CPU。
 
+### 测试
+
+```bash
+.venv/Scripts/python -m unittest discover -s sidecar/tests -v
+npm run typecheck
+```
+
+腾讯云 SOE 适配器的签名、响应归一化和本地 WebSocket 回放都有离线测试，不需要真实凭据。
+
 ### 打包 Windows 安装包
 
 ```bash
@@ -193,7 +215,7 @@ npm run dist
 ```
 
 - `build:sidecar` 用 PyInstaller 冻结 Python 引擎，并把 cuBLAS / cuDNN / ffmpeg / ffprobe 一起放进 `sidecar-dist/`
-- `dist` 用 electron-builder 生成 `release/Echo-Setup-0.5.0.exe`
+- `dist` 用 electron-builder 生成 `release/Echo-Setup-0.6.0.exe`
 - 也可以直接运行 `powershell -File scripts/build-installer.ps1` 一步完成
 - 安装包约 **1.4 GB**（含 CUDA 运行库和 ffmpeg），安装后约 **3.1 GB**
 - 安装包未签名，Windows SmartScreen 可能提示；选择「仍要运行」
@@ -217,8 +239,8 @@ npm run dist
 ## 已知限制
 
 - 安装包未签名，Windows SmartScreen 可能提示；安装包约 1.4 GB（含 CUDA/ffmpeg），安装后约 3.1 GB。
-- 本地跟读评测基于 Whisper 识别，**不是音素级发音评分**；轻微的发音偏差可能仍被识别为正确。需要音素级结果时请配置 Azure 评分。
-- Azure 评分需要你自己的 Azure Speech 资源密钥和区域，且会把选中的录音发送到 Microsoft 云端计费；没有密钥时该功能不可用，但本地评测不受影响。Azure 音素评分使用 30 秒以内的 16k 单声道 WAV，代码包含请求和响应解析的离线测试，但真实 Azure 调用需要你的凭据才能验证。
+- 本地跟读评测基于 Whisper 识别，**不是音素级发音评分**；轻微的发音偏差可能仍被识别为正确。需要音素级结果时请配置腾讯云智聆或 Azure 评分。
+- 在线发音评分需要你自己的腾讯云或 Azure 凭据，且会把选中的录音发送到对应云端计费；没有凭据时该功能不可用，但本地评测不受影响。腾讯云 SOE 使用 60 秒以内的 16k 单声道 PCM，Azure 最长 30 秒；适配层的签名和响应解析有离线单元测试（`sidecar/tests`），真实调用需要你的凭据才能验证。
 - 重新转写会重建句子 ID，之前保存的跟读录音仍留在磁盘和记录里，但不会再挂到新句子上。
 - 在线视频：DRM 平台（Netflix、爱奇艺等）无法下载；部分站点需要登录 cookie，暂未提供配置入口。
 - 视频容器：Chromium 最稳的是 MP4 / WebM；MKV、AVI、FLV 等可能无法直接播放，后续会加自动转封装。

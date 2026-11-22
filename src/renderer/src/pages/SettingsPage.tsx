@@ -6,6 +6,7 @@ import {
   Cpu,
   FileText,
   FolderOpen,
+  KeyRound,
   Loader2,
   RefreshCw,
   Repeat2,
@@ -34,6 +35,10 @@ export default function SettingsPage(): ReactElement {
   const [azureKey, setAzureKey] = useState('')
   const [azureRegion, setAzureRegion] = useState('')
   const [azureSaving, setAzureSaving] = useState(false)
+  const [tencentAppId, setTencentAppId] = useState('')
+  const [tencentSecretId, setTencentSecretId] = useState('')
+  const [tencentSecretKey, setTencentSecretKey] = useState('')
+  const [tencentSaving, setTencentSaving] = useState(false)
 
   const load = async (): Promise<void> => {
     setLoading(true)
@@ -48,6 +53,7 @@ export default function SettingsPage(): ReactElement {
       setHealth(nextHealth)
       setAppInfo(info)
       setAzureRegion(nextSettings.azure_speech_region)
+      setTencentAppId(nextSettings.tencent_app_id)
     } catch (loadError) {
       setError(errorMessage(loadError))
     } finally {
@@ -126,6 +132,69 @@ export default function SettingsPage(): ReactElement {
       push(errorMessage(azureError), 'error')
     } finally {
       setAzureSaving(false)
+    }
+  }
+
+  const handleTencentSave = async (): Promise<void> => {
+    if (!settings) return
+    const appId = tencentAppId.trim()
+    const secretId = tencentSecretId.trim()
+    const secretKey = tencentSecretKey.trim()
+    if (!appId) {
+      push('请填写腾讯云 AppID（纯数字）', 'error')
+      return
+    }
+    if (!secretId && !settings.tencent_configured) {
+      push('请填写腾讯云 SecretId', 'error')
+      return
+    }
+    if (!secretKey && !settings.tencent_configured) {
+      push('请填写腾讯云 SecretKey', 'error')
+      return
+    }
+    setTencentSaving(true)
+    try {
+      const updated = await api.patchSettings({
+        tencent_speech_app_id: appId,
+        ...(secretId ? { tencent_speech_secret_id: secretId } : {}),
+        ...(secretKey ? { tencent_speech_secret_key: secretKey } : {})
+      })
+      setSettings(updated)
+      setTencentAppId(updated.tencent_app_id)
+      setTencentSecretId('')
+      setTencentSecretKey('')
+      push('腾讯云智聆配置已保存', 'success')
+    } catch (tencentError) {
+      push(errorMessage(tencentError), 'error')
+    } finally {
+      setTencentSaving(false)
+    }
+  }
+
+  const handleTencentClear = async (): Promise<void> => {
+    if (
+      !window.confirm(
+        '清除腾讯云智聆配置？之后跟读页会改用其他已配置的评测服务，或无法使用在线评分。'
+      )
+    ) {
+      return
+    }
+    setTencentSaving(true)
+    try {
+      const updated = await api.patchSettings({
+        tencent_speech_app_id: '',
+        tencent_speech_secret_id: '',
+        tencent_speech_secret_key: ''
+      })
+      setSettings(updated)
+      setTencentAppId('')
+      setTencentSecretId('')
+      setTencentSecretKey('')
+      push('已清除腾讯云智聆配置', 'success')
+    } catch (tencentError) {
+      push(errorMessage(tencentError), 'error')
+    } finally {
+      setTencentSaving(false)
     }
   }
 
@@ -333,6 +402,99 @@ export default function SettingsPage(): ReactElement {
         <section className="settings-card">
           <div className="settings-card-header">
             <div className="settings-icon">
+              <KeyRound size={18} />
+            </div>
+            <div>
+              <h2>腾讯云智聆发音评测（推荐）</h2>
+              <p>音素级发音评估；核心功能仍然离线。</p>
+            </div>
+          </div>
+
+          {settings.tencent_configured ? (
+            <p className="dict-status">
+              <CheckCircle2 size={16} /> 已配置 · AppID {settings.tencent_app_id} ·
+              SecretId {settings.tencent_secret_id_masked}
+              {settings.pronunciation_provider === 'tencent' ? ' · 当前使用' : ''}
+            </p>
+          ) : (
+            <p className="dict-status missing">
+              尚未配置。不配置也可以正常使用本地跟读评测。
+            </p>
+          )}
+
+          <label className="field">
+            <span>AppID</span>
+            <input
+              value={tencentAppId}
+              onChange={(event) => setTencentAppId(event.target.value)}
+              placeholder="腾讯云账号 AppID，纯数字"
+              inputMode="numeric"
+            />
+          </label>
+          <label className="field">
+            <span>SecretId</span>
+            <input
+              type="password"
+              autoComplete="off"
+              value={tencentSecretId}
+              onChange={(event) => setTencentSecretId(event.target.value)}
+              placeholder={
+                settings.tencent_configured
+                  ? '已保存，留空则不修改'
+                  : 'AKID 开头的 SecretId'
+              }
+            />
+          </label>
+          <label className="field">
+            <span>SecretKey</span>
+            <input
+              type="password"
+              autoComplete="off"
+              value={tencentSecretKey}
+              onChange={(event) => setTencentSecretKey(event.target.value)}
+              placeholder={
+                settings.tencent_configured
+                  ? '已保存，留空则不修改'
+                  : '与 SecretId 配对的 SecretKey'
+              }
+            />
+          </label>
+
+          <div className="settings-actions">
+            <button
+              className="btn btn-primary"
+              onClick={() => void handleTencentSave()}
+              disabled={tencentSaving}
+            >
+              {tencentSaving ? (
+                <Loader2 size={15} className="spin" />
+              ) : (
+                <KeyRound size={15} />
+              )}
+              保存腾讯云配置
+            </button>
+            {settings.tencent_configured ? (
+              <button
+                className="btn"
+                onClick={() => void handleTencentClear()}
+                disabled={tencentSaving}
+              >
+                清除
+              </button>
+            ) : null}
+          </div>
+
+          <p className="hint">
+            在腾讯云控制台开通「智聆口语评测」后，到「访问管理 → API
+            密钥管理」创建密钥。点击跟读页的「腾讯云
+            评分」时，选中的录音会上传到腾讯云；凭据只保存在本机数据库。录音会自动转成
+            16kHz 单声道 WAV，最长支持 60 秒。
+          </p>
+        </section>
+
+        <section className="settings-card">
+          <div className="settings-card-header">
+            <div className="settings-icon">
               <Cloud size={18} />
             </div>
             <div>
@@ -340,6 +502,13 @@ export default function SettingsPage(): ReactElement {
               <p>Microsoft Azure 的音素级发音评估；核心功能仍然离线。</p>
             </div>
           </div>
+
+          {settings.tencent_configured && settings.azure_configured ? (
+            <p className="hint warn">
+              腾讯云和 Azure 都配置时，跟读页优先使用腾讯云。需要改用
+              Azure 时，请先清除腾讯云配置。
+            </p>
+          ) : null}
 
           {settings.azure_configured ? (
             <p className="dict-status">
@@ -404,6 +573,9 @@ export default function SettingsPage(): ReactElement {
             「Azure 评分」时，选中的录音会上传到 Microsoft Azure；密钥只保存在本机数据库。
             Azure 发音评估最长支持 30 秒。
           </p>
+          <p className="hint">
+            如果 Azure 登录或创建资源一直报错，可以先不配置它；腾讯云智聆或本地评测都仍然可用。
+          </p>
         </section>
 
         <section className="settings-card">
@@ -445,15 +617,15 @@ export default function SettingsPage(): ReactElement {
           </div>
           <div className="settings-row">
             <span className="settings-label">版本</span>
-            <span className="settings-value">v{appInfo?.version ?? '0.5.0'} · 学习计划</span>
+            <span className="settings-value">v{appInfo?.version ?? '0.6.0'} · 发音评测</span>
           </div>
           <div className="settings-row">
             <span className="settings-label">技术栈</span>
             <span className="settings-value">Electron + React + faster-whisper</span>
           </div>
           <p className="hint">
-            核心转写、查词、复习、默写和跟读都在本地运行；在线素材下载和 Azure
-            发音评分需要联网，Azure 评分是可选项。
+            核心转写、查词、复习、默写和跟读都在本地运行；在线素材下载、腾讯云
+            智聆和 Azure 发音评分需要联网，发音评分是可选项。
           </p>
         </section>
       </div>

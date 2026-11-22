@@ -31,7 +31,7 @@ WHISPER_MODELS = [
 ]
 MODEL_IDS = {model["id"] for model in WHISPER_MODELS}
 
-app = FastAPI(title="Echo Sidecar", version="0.5.0")
+app = FastAPI(title="Echo Sidecar", version="0.6.0")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -53,7 +53,7 @@ app.include_router(plan_router)
 def health() -> dict[str, Any]:
     return {
         "ok": True,
-        "version": "0.5.0",
+        "version": "0.6.0",
         "whisper_model": db.get_setting("whisper_model", "small.en"),
         "device": runtime.get("device") or "auto",
         "model_loaded": runtime.get("model"),
@@ -597,16 +597,46 @@ def attach_dictionary(payload: DictionaryAttach) -> dict[str, Any]:
 # ---------------------------------------------------------------- 设置
 
 
-@app.get("/api/settings")
-def get_settings() -> dict[str, Any]:
+def _masked(value: str) -> str | None:
+    return f"****{value[-4:]}" if value else None
+
+
+def _speech_settings() -> dict[str, Any]:
     azure_key = db.get_setting("azure_speech_key", "") or ""
     azure_region = db.get_setting("azure_speech_region", "") or ""
+    tencent_app_id = db.get_setting("tencent_speech_app_id", "") or ""
+    tencent_secret_id = db.get_setting("tencent_speech_secret_id", "") or ""
+    tencent_secret_key = db.get_setting("tencent_speech_secret_key", "") or ""
+
+    azure_configured = bool(azure_key and azure_region)
+    tencent_configured = bool(
+        tencent_app_id and tencent_secret_id and tencent_secret_key
+    )
+    # 腾讯云优先；两者都配置时跟读页使用腾讯云。
+    provider = (
+        "tencent"
+        if tencent_configured
+        else ("azure" if azure_configured else None)
+    )
+    return {
+        "azure_configured": azure_configured,
+        "azure_speech_region": azure_region,
+        "azure_key_masked": _masked(azure_key),
+        "tencent_configured": tencent_configured,
+        "tencent_app_id": tencent_app_id,
+        "tencent_secret_id_masked": _masked(tencent_secret_id),
+        "tencent_secret_key_masked": _masked(tencent_secret_key),
+        "pronunciation_provider": provider,
+        "pronunciation_configured": provider is not None,
+    }
+
+
+@app.get("/api/settings")
+def get_settings() -> dict[str, Any]:
     return {
         "whisper_model": db.get_setting("whisper_model", "small.en"),
         "daily_new_limit": int(db.get_setting("daily_new_limit", "20") or 20),
-        "azure_configured": bool(azure_key and azure_region),
-        "azure_speech_region": azure_region,
-        "azure_key_masked": (f"****{azure_key[-4:]}" if azure_key else None),
+        **_speech_settings(),
         "models": WHISPER_MODELS,
     }
 
@@ -616,6 +646,9 @@ class SettingsPatch(BaseModel):
     daily_new_limit: int | None = Field(default=None, ge=0, le=200)
     azure_speech_key: str | None = None
     azure_speech_region: str | None = Field(default=None, max_length=64)
+    tencent_speech_app_id: str | None = Field(default=None, max_length=32)
+    tencent_speech_secret_id: str | None = Field(default=None, max_length=128)
+    tencent_speech_secret_key: str | None = Field(default=None, max_length=128)
 
 
 @app.patch("/api/settings")
@@ -639,4 +672,23 @@ def patch_settings(payload: SettingsPatch) -> dict[str, Any]:
         if region and not re.fullmatch(r"[a-z0-9-]+", region):
             raise HTTPException(status_code=400, detail="Azure 区域格式不正确，例如 eastus")
         db.set_setting("azure_speech_region", region)
+    if payload.tencent_speech_app_id is not None:
+        app_id = payload.tencent_speech_app_id.strip()
+        if app_id and not re.fullmatch(r"\d{5,20}", app_id):
+            raise HTTPException(status_code=400, detail="腾讯云 AppID 应该是纯数字")
+        db.set_setting("tencent_speech_app_id", app_id)
+    if payload.tencent_speech_secret_id is not None:
+        secret_id = payload.tencent_speech_secret_id.strip()
+        if secret_id and len(secret_id) < 8:
+            raise HTTPException(
+                status_code=400, detail="腾讯云 SecretId 看起来不完整"
+            )
+        db.set_setting("tencent_speech_secret_id", secret_id)
+    if payload.tencent_speech_secret_key is not None:
+        secret_key = payload.tencent_speech_secret_key.strip()
+        if secret_key and len(secret_key) < 8:
+            raise HTTPException(
+                status_code=400, detail="腾讯云 SecretKey 看起来不完整"
+            )
+        db.set_setting("tencent_speech_secret_key", secret_key)
     return get_settings()

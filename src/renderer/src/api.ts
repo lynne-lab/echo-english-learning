@@ -1,6 +1,5 @@
 import type {
   AppSettings,
-  AzureFeedback,
   DictationGrade,
   DictationMode,
   DictationSession,
@@ -8,6 +7,7 @@ import type {
   DictionaryEntry,
   Health,
   Material,
+  PronunciationFeedback,
   Recording,
   RecordingFeedback,
   ReviewPreview,
@@ -128,6 +128,9 @@ export const api = {
     daily_new_limit?: number
     azure_speech_key?: string
     azure_speech_region?: string
+    tencent_speech_app_id?: string
+    tencent_speech_secret_id?: string
+    tencent_speech_secret_key?: string
   }) =>
     request<AppSettings>('/api/settings', {
       method: 'PATCH',
@@ -180,8 +183,13 @@ export const api = {
     request<RecordingFeedback>(`/api/recordings/${recordingId}/analyze`, {
       method: 'POST'
     }),
+  pronunciationScoreRecording: (recordingId: string) =>
+    request<PronunciationFeedback>(
+      `/api/recordings/${recordingId}/pronunciation-score`,
+      { method: 'POST' }
+    ),
   azureScoreRecording: (recordingId: string) =>
-    request<AzureFeedback>(`/api/recordings/${recordingId}/azure-score`, {
+    request<PronunciationFeedback>(`/api/recordings/${recordingId}/azure-score`, {
       method: 'POST'
     }),
 
