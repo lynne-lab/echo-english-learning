@@ -1,0 +1,32 @@
+appId: com.echo.english
+productName: Echo
+directories:
+  output: release
+  buildResources: build
+files:
+  - out/**/*
+  - package.json
+  - "!node_modules/**/*"
+extraResources:
+  - from: sidecar-dist/echo-sidecar
+    to: sidecar
+  - from: resources/bin
+    to: bin
+asar: true
+npmRebuild: false
+compression: maximum
+artifactName: ${productName}-Setup-${version}.${ext}
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+  icon: build/icon.ico
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: Echo
+  uninstallDisplayName: Echo

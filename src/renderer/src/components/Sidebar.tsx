@@ -1,0 +1,95 @@
+import { useEffect, useState, type ReactElement } from 'react'
+import { NavLink } from 'react-router-dom'
+import {
+  Activity,
+  AudioLines,
+  BookMarked,
+  CalendarRange,
+  LibraryBig,
+  PenLine,
+  Repeat2,
+  Settings2,
+  ShieldCheck
+} from 'lucide-react'
+import { api } from '../api'
+
+const items = [
+  { to: '/library', label: '素材库', icon: LibraryBig },
+  { to: '/plan', label: '学习计划', icon: CalendarRange },
+  { to: '/review', label: '今日复习', icon: Repeat2, badge: true },
+  { to: '/dictation', label: '默写', icon: PenLine },
+  { to: '/words', label: '生词本', icon: BookMarked },
+  { to: '/stats', label: '学习统计', icon: Activity },
+  { to: '/settings', label: '设置', icon: Settings2 }
+]
+
+export default function Sidebar(): ReactElement {
+  const [dueCount, setDueCount] = useState(0)
+
+  useEffect(() => {
+    let cancelled = false
+    let timer = 0
+
+    const load = async (): Promise<void> => {
+      try {
+        const summary = await api.reviewsSummary()
+        if (!cancelled) {
+          setDueCount(summary.due_reviews + summary.new_available)
+        }
+      } catch {
+        /* engine may still be starting */
+      }
+    }
+
+    const refresh = (): void => {
+      void load()
+    }
+
+    void load()
+    timer = window.setInterval(refresh, 60000)
+    window.addEventListener('echo:review-changed', refresh)
+    return () => {
+      cancelled = true
+      window.clearInterval(timer)
+      window.removeEventListener('echo:review-changed', refresh)
+    }
+  }, [])
+
+  return (
+    <aside className="sidebar">
+      <div className="brand">
+        <div className="brand-mark">
+          <AudioLines size={22} />
+        </div>
+        <div>
+          <div className="brand-name">Echo</div>
+          <div className="brand-tag">英语精听 · 跟读</div>
+        </div>
+      </div>
+
+      <nav className="nav">
+        {items.map(({ to, label, icon: Icon, badge }) => (
+          <NavLink
+            key={to}
+            to={to}
+            className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}
+          >
+            <Icon size={18} strokeWidth={1.9} />
+            <span>{label}</span>
+            {badge && dueCount > 0 ? (
+              <span className="nav-badge">{dueCount > 99 ? '99+' : dueCount}</span>
+            ) : null}
+          </NavLink>
+        ))}
+      </nav>
+
+      <div className="sidebar-footer">
+        <div className="offline-badge">
+          <ShieldCheck size={15} />
+          <span>本地运行 · 离线优先</span>
+        </div>
+        <div className="version">v0.5.0 · 学习计划</div>
+      </div>
+    </aside>
+  )
+}

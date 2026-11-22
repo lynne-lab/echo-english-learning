@@ -1,0 +1,7 @@
+-r requirements.txt
+
+# Windows GPU acceleration for faster-whisper/ctranslate2.
+# cuBLAS 12.9.3.x no longer publishes Windows wheels, so pin 12.9.2.10.
+nvidia-cublas-cu12==12.9.2.10; platform_system == "Windows"
+nvidia-cudnn-cu12>=9.0; platform_system == "Windows"
+nvidia-cuda-runtime-cu12; platform_system == "Windows"

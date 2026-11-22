@@ -1,0 +1,16 @@
+node_modules/
+out/
+dist/
+.venv/
+data/
+sidecar-build/
+sidecar-dist/
+release/
+resources/bin/
+__pycache__/
+*.pyc
+*.log
+*.tsbuildinfo
+.DS_Store
+
+packaged-test/

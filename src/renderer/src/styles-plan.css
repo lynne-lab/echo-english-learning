@@ -1,0 +1,744 @@
+/* ------------------------------------------------------------------ study plan */
+
+.plan-page {
+  max-width: 1260px;
+}
+
+.plan-intro {
+  display: flex;
+  align-items: flex-start;
+  gap: 18px;
+  padding: 24px;
+  margin-bottom: 16px;
+  border-radius: 18px;
+  border: 1px solid rgba(94, 234, 212, 0.16);
+  background:
+    radial-gradient(620px 220px at 8% 0%, rgba(94, 234, 212, 0.11), transparent 62%),
+    linear-gradient(140deg, rgba(23, 33, 49, 0.88), rgba(13, 19, 29, 0.94));
+}
+
+.plan-intro-mark {
+  width: 54px;
+  height: 54px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 16px;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border: 1px solid rgba(94, 234, 212, 0.18);
+}
+
+.plan-intro h2 {
+  margin: 5px 0 6px;
+  font-size: 23px;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+
+.plan-intro p {
+  margin: 0;
+  max-width: 720px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.plan-phase-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.plan-phase-card {
+  position: relative;
+  overflow: hidden;
+  min-height: 178px;
+  padding: 18px;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  background: linear-gradient(160deg, rgba(23, 33, 49, 0.72), rgba(14, 20, 30, 0.9));
+}
+
+.plan-phase-card::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  height: 2px;
+  background: var(--accent);
+  opacity: 0.75;
+}
+
+.plan-phase-card.phase-growth::before {
+  background: var(--indigo);
+}
+
+.plan-phase-card.phase-real_speed::before {
+  background: #d95926;
+}
+
+.plan-phase-card-head span {
+  display: block;
+  color: var(--faint);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.plan-phase-card-head h3 {
+  margin: 4px 0 8px;
+  font-size: 20px;
+  font-weight: 650;
+}
+
+.plan-phase-card > p {
+  margin: 0 0 12px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.plan-phase-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.plan-phase-tags span {
+  max-width: 100%;
+  padding: 4px 8px;
+  border-radius: 999px;
+  color: var(--faint);
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid var(--border);
+  font-size: 10px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.plan-start-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+  margin-bottom: 14px;
+}
+
+.plan-start-copy {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.plan-start-icon {
+  width: 38px;
+  height: 38px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 11px;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border: 1px solid rgba(94, 234, 212, 0.14);
+}
+
+.plan-start-copy h2 {
+  margin: 0 0 3px;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.plan-start-copy p {
+  margin: 0;
+  color: var(--faint);
+  font-size: 11.5px;
+  line-height: 1.6;
+}
+
+.plan-start-form {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.plan-start-form .field {
+  flex: 1 1 320px;
+  margin-bottom: 0;
+}
+
+.plan-start-panel .hint a {
+  color: var(--accent);
+}
+
+.plan-rules {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.plan-rules > div {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  align-items: start;
+  column-gap: 9px;
+  padding: 15px 16px;
+  border-radius: 13px;
+  border: 1px solid var(--border);
+  background: linear-gradient(180deg, rgba(23, 33, 49, 0.6), rgba(15, 21, 32, 0.75));
+}
+
+.plan-rules svg {
+  grid-row: span 2;
+  margin-top: 1px;
+  color: var(--accent);
+}
+
+.plan-rules strong {
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.plan-rules span {
+  grid-column: 2;
+  color: var(--faint);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+/* ------------------------------------------------------------------ active plan hero */
+
+.plan-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(250px, 0.7fr);
+  gap: 18px;
+  padding: 22px;
+  margin-bottom: 16px;
+  border-radius: 18px;
+  border: 1px solid var(--border);
+  background:
+    radial-gradient(640px 240px at 5% 0%, rgba(94, 234, 212, 0.1), transparent 62%),
+    linear-gradient(140deg, rgba(23, 33, 49, 0.86), rgba(13, 19, 29, 0.93));
+}
+
+.plan-hero-top {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 9px;
+  margin-bottom: 9px;
+}
+
+.plan-phase-pill {
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 9px;
+  border-radius: 999px;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border: 1px solid rgba(94, 234, 212, 0.18);
+  font-size: 10.5px;
+  font-weight: 650;
+  letter-spacing: 0.03em;
+}
+
+.plan-phase-pill.muted {
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.04);
+  border-color: var(--border);
+}
+
+.plan-hero-week {
+  color: var(--faint);
+  font-size: 11px;
+}
+
+.plan-hero-body h2 {
+  margin: 0 0 5px;
+  font-size: 23px;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+
+.plan-hero-body > p {
+  margin: 0;
+  max-width: 680px;
+  color: var(--muted);
+  font-size: 12.5px;
+  line-height: 1.7;
+}
+
+.plan-progress-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.plan-progress-track {
+  flex: 1;
+  height: 7px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.plan-progress-track > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #2dd4bf, #5eead4);
+}
+
+.plan-progress-row > strong {
+  min-width: 34px;
+  color: var(--accent);
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.plan-hero-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 17px;
+}
+
+.plan-hero-stats > div {
+  padding: 10px 11px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: rgba(10, 14, 21, 0.28);
+}
+
+.plan-hero-stats strong {
+  display: block;
+  font-size: 19px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+}
+
+.plan-hero-stats span {
+  display: block;
+  margin-top: 2px;
+  color: var(--faint);
+  font-size: 10px;
+}
+
+.plan-hero-aside {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 12px;
+  padding-left: 18px;
+  border-left: 1px solid var(--border);
+}
+
+.plan-kicker {
+  color: var(--faint);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+
+.plan-hero-materials {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.plan-hero-materials span {
+  display: block;
+  padding: 7px 9px;
+  border-radius: 8px;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid var(--border);
+  font-size: 10.5px;
+  line-height: 1.4;
+}
+
+.plan-hero-actions {
+  margin-top: auto;
+}
+
+/* ------------------------------------------------------------------ tasks and side */
+
+.plan-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(290px, 0.8fr);
+  gap: 14px;
+  align-items: start;
+}
+
+.plan-tasks-panel {
+  min-width: 0;
+}
+
+.plan-task-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.plan-task {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 14px 0;
+  border-bottom: 1px dashed var(--border);
+  transition: opacity 0.15s ease;
+}
+
+.plan-task:last-child {
+  border-bottom: 0;
+  padding-bottom: 2px;
+}
+
+.plan-task.completed {
+  opacity: 0.58;
+}
+
+.plan-task.completed .plan-task-title h3 {
+  text-decoration: line-through;
+  text-decoration-color: var(--faint);
+}
+
+.plan-task.busy {
+  opacity: 0.75;
+}
+
+.plan-check {
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--faint);
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.plan-check:hover {
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.plan-check[aria-pressed='true'] {
+  color: var(--accent);
+}
+
+.plan-task-icon {
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  color: var(--muted);
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+}
+
+.plan-task-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.plan-task-title {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.plan-task-title h3 {
+  margin: 0;
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.plan-task-title span {
+  color: var(--faint);
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.plan-task-body p {
+  margin: 3px 0 0;
+  color: var(--faint);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.plan-task-action {
+  flex-shrink: 0;
+}
+
+.plan-side {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.plan-side-card {
+  padding: 17px;
+}
+
+.plan-side-card .section-head {
+  margin-bottom: 10px;
+}
+
+.plan-side-empty {
+  margin: 0 0 10px;
+  color: var(--faint);
+  font-size: 11.5px;
+}
+
+.plan-select {
+  width: 100%;
+  height: 38px;
+  padding: 0 34px 0 11px;
+  border-radius: 9px;
+  border: 1px solid var(--border);
+  background-color: var(--bg-soft);
+  background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%),
+    linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+  background-position: calc(100% - 18px) 17px, calc(100% - 13px) 17px;
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+  color: var(--text);
+  font-size: 12px;
+  appearance: none;
+  outline: none;
+  cursor: pointer;
+}
+
+.plan-select:focus {
+  border-color: rgba(94, 234, 212, 0.45);
+}
+
+.plan-select:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.plan-material-info {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 9px;
+  color: var(--faint);
+  font-size: 10.5px;
+}
+
+.plan-status {
+  display: inline-flex;
+  align-items: center;
+  height: 21px;
+  padding: 0 7px;
+  border-radius: 999px;
+  font-size: 9.5px;
+  font-weight: 600;
+}
+
+.plan-status.ready {
+  color: var(--success);
+  background: rgba(52, 211, 153, 0.08);
+  border: 1px solid rgba(52, 211, 153, 0.16);
+}
+
+.plan-status.processing {
+  color: var(--warning);
+  background: rgba(251, 191, 36, 0.08);
+  border: 1px solid rgba(251, 191, 36, 0.16);
+}
+
+.plan-status.error {
+  color: var(--danger);
+  background: var(--danger-soft);
+  border: 1px solid rgba(251, 113, 133, 0.16);
+}
+
+.plan-side-link {
+  margin-top: 11px;
+}
+
+.plan-week {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.plan-day {
+  padding: 7px 2px 6px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: rgba(10, 14, 21, 0.26);
+  text-align: center;
+}
+
+.plan-day.today {
+  border-color: rgba(94, 234, 212, 0.28);
+  background: var(--accent-soft);
+}
+
+.plan-day.outside {
+  opacity: 0.32;
+}
+
+.plan-day-label {
+  display: block;
+  color: var(--faint);
+  font-size: 9.5px;
+}
+
+.plan-day-dots {
+  display: flex;
+  justify-content: center;
+  gap: 2px;
+  margin: 5px 0 4px;
+}
+
+.plan-day-dots i {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--border-strong);
+}
+
+.plan-day-dots i.on {
+  background: var(--accent);
+}
+
+.plan-day-count {
+  color: var(--faint);
+  font-size: 9px;
+  font-variant-numeric: tabular-nums;
+}
+
+.plan-catalog-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.plan-catalog-item {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 9px;
+  padding: 9px 0;
+  border-bottom: 1px dashed var(--border);
+}
+
+.plan-catalog-item:first-child {
+  padding-top: 0;
+}
+
+.plan-catalog-item:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.plan-catalog-main {
+  min-width: 0;
+}
+
+.plan-catalog-main h3 {
+  margin: 0 0 2px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.plan-catalog-main p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.plan-catalog-main span {
+  display: block;
+  margin-top: 3px;
+  color: var(--faint);
+  font-size: 10.5px;
+  line-height: 1.5;
+}
+
+.plan-catalog-link {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--accent);
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.plan-catalog-link:hover {
+  text-decoration: underline;
+}
+
+/* ------------------------------------------------------------------ responsive */
+
+@media (max-width: 1120px) {
+  .plan-phase-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .plan-phase-card {
+    min-height: 0;
+  }
+
+  .plan-hero {
+    grid-template-columns: 1fr;
+  }
+
+  .plan-hero-aside {
+    padding-top: 13px;
+    padding-left: 0;
+    border-top: 1px solid var(--border);
+    border-left: 0;
+  }
+
+  .plan-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .plan-side {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+  }
+}
+
+@media (max-width: 760px) {
+  .plan-rules,
+  .plan-side {
+    grid-template-columns: 1fr;
+  }
+
+  .plan-hero-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .plan-task {
+    flex-wrap: wrap;
+  }
+
+  .plan-task-body {
+    flex-basis: calc(100% - 100px);
+  }
+
+  .plan-task-action {
+    margin-left: 77px;
+  }
+}

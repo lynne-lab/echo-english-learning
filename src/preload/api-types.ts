@@ -1,0 +1,22 @@
+export interface AppInfo {
+  version: string
+  dataDir: string
+  sidecarUrl: string
+  platform: string
+}
+
+export interface EchoApi {
+  selectMediaFile(): Promise<string | null>
+  selectDictionaryFile(): Promise<string | null>
+  getPathForFile(file: File): string
+  getAppInfo(): Promise<AppInfo>
+  openDataDir(): Promise<void>
+  openSidecarLog(): Promise<void>
+  getSidecarUrl(): Promise<string>
+}
+
+declare global {
+  interface Window {
+    api: EchoApi
+  }
+}
