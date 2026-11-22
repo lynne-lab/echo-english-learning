@@ -24,15 +24,17 @@ import {
 import { api, mediaUrl } from '../api'
 import { DiffedSentence, ErrorChips } from '../components/GradeDiff'
 import { useToast } from '../components/Toast'
+import WordPanel from '../components/WordPanel'
 import type {
   DictationErrors,
   DictationGrade,
   DictationItem,
   DictationMode,
   DictationSession,
+  DictionaryEntry,
   Material
 } from '../types'
-import { errorMessage, formatDuration } from '../utils'
+import { errorMessage, formatDuration, speakWord, stripWord } from '../utils'
 
 const COUNT_OPTIONS = [
   { value: 5, label: '5 句' },
@@ -46,13 +48,17 @@ function GradePanel({
   userText,
   isLast,
   onNext,
-  onReplay
+  onReplay,
+  onWordClick,
+  wordPanel
 }: {
   grade: DictationGrade
   userText: string
   isLast: boolean
   onNext: () => void
   onReplay: () => void
+  onWordClick?: (word: string) => void
+  wordPanel?: ReactElement | null
 }): ReactElement {
   const percent = Math.round(grade.accuracy * 100)
   const extras = grade.tokens.filter((token) => token.kind === 'extra')
@@ -79,8 +85,15 @@ function GradePanel({
       </div>
 
       <div className="diff-block">
-        <span className="diff-label">原文批改</span>
-        <DiffedSentence text={grade.expected_text} tokens={grade.tokens} />
+        <span className="diff-label">
+          原文批改
+          {onWordClick ? <em className="diff-label-hint">点击单词可查词 / 加入生词本</em> : null}
+        </span>
+        <DiffedSentence
+          text={grade.expected_text}
+          tokens={grade.tokens}
+          onWordClick={onWordClick}
+        />
         {extras.length > 0 ? (
           <div className="extra-words">
             <span>多写：</span>
@@ -98,6 +111,8 @@ function GradePanel({
           </p>
         ) : null}
       </div>
+
+      {wordPanel ? <div className="grade-word-panel">{wordPanel}</div> : null}
 
       {corrections.length > 0 ? (
         <div className="corrections">
@@ -153,8 +168,18 @@ export default function DictationPage(): ReactElement {
   const [audioTime, setAudioTime] = useState(0)
   const [speed, setSpeed] = useState(1)
 
+  const [selectedWord, setSelectedWord] = useState<{
+    word: string
+    sentenceId: string
+  } | null>(null)
+  const [dictEntry, setDictEntry] = useState<DictionaryEntry | null>(null)
+  const [dictLoading, setDictLoading] = useState(false)
+  const [wordAdded, setWordAdded] = useState(false)
+  const [wordAdding, setWordAdding] = useState(false)
+
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const stopAtRef = useRef<number | null>(null)
+  const lookupSeqRef = useRef(0)
 
   const currentItem = session?.items[index] ?? null
 
@@ -275,6 +300,62 @@ export default function DictationPage(): ReactElement {
     }
   }
 
+  const closeWordPanel = (): void => {
+    lookupSeqRef.current += 1
+    setSelectedWord(null)
+    setDictEntry(null)
+    setDictLoading(false)
+    setWordAdded(false)
+    setWordAdding(false)
+  }
+
+  const handleWordClick = async (raw: string): Promise<void> => {
+    const word = stripWord(raw)
+    if (!word || !currentItem) return
+    const sentenceId = currentItem.sentence_id
+    const seq = lookupSeqRef.current + 1
+    lookupSeqRef.current = seq
+    setSelectedWord({ word, sentenceId })
+    setDictEntry(null)
+    setWordAdded(false)
+    setWordAdding(false)
+    setDictLoading(true)
+    try {
+      const entry = await api.lookup(word)
+      if (lookupSeqRef.current !== seq) return
+      setDictEntry(entry)
+      setWordAdded(entry.in_wordbook)
+    } catch {
+      if (lookupSeqRef.current !== seq) return
+      setDictEntry(null)
+    } finally {
+      if (lookupSeqRef.current === seq) setDictLoading(false)
+    }
+  }
+
+  const handleAddWord = async (): Promise<void> => {
+    if (!selectedWord || wordAdding) return
+    const seq = lookupSeqRef.current
+    setWordAdding(true)
+    try {
+      const result = await api.addWord(selectedWord.word, selectedWord.sentenceId)
+      if (lookupSeqRef.current !== seq) return
+      setWordAdded(true)
+      setDictEntry((previous) =>
+        previous ? { ...previous, in_wordbook: true, word_id: result.id } : previous
+      )
+      window.dispatchEvent(new Event('echo:review-changed'))
+      push(
+        result.created ? `已加入生词本：${result.lemma}` : `已在生词本：${result.lemma}`,
+        'success'
+      )
+    } catch (error) {
+      if (lookupSeqRef.current === seq) push(errorMessage(error), 'error')
+    } finally {
+      if (lookupSeqRef.current === seq) setWordAdding(false)
+    }
+  }
+
   const startSession = async (): Promise<void> => {
     if (!material || starting) return
     setStarting(true)
@@ -285,6 +366,7 @@ export default function DictationPage(): ReactElement {
       setUserText('')
       setGrade(null)
       setAttempts([])
+      closeWordPanel()
       setPhase('session')
     } catch (startError) {
       push(errorMessage(startError), 'error')
@@ -321,6 +403,7 @@ export default function DictationPage(): ReactElement {
 
   const next = (): void => {
     if (!session) return
+    closeWordPanel()
     if (index + 1 >= session.items.length) {
       audioRef.current?.pause()
       setAudioPlaying(false)
@@ -335,6 +418,7 @@ export default function DictationPage(): ReactElement {
   const resetToSetup = (): void => {
     audioRef.current?.pause()
     setAudioPlaying(false)
+    closeWordPanel()
     setPhase('setup')
     setSession(null)
     setAttempts([])
@@ -752,6 +836,21 @@ export default function DictationPage(): ReactElement {
             isLast={isLast}
             onNext={next}
             onReplay={() => playCurrent(true)}
+            onWordClick={(word) => void handleWordClick(word)}
+            wordPanel={
+              selectedWord ? (
+                <WordPanel
+                  word={selectedWord.word}
+                  entry={dictEntry}
+                  loading={dictLoading}
+                  added={wordAdded}
+                  adding={wordAdding}
+                  onAdd={() => void handleAddWord()}
+                  onSpeak={() => speakWord(selectedWord.word)}
+                  onClose={closeWordPanel}
+                />
+              ) : null
+            }
           />
         ) : null}
       </div>

@@ -13,10 +13,12 @@ const WORD_PATTERN = /[A-Za-z]+(?:['’\-][A-Za-z]+)*|\d+(?:[.,]\d+)*/g
 
 export function DiffedSentence({
   text,
-  tokens
+  tokens,
+  onWordClick
 }: {
   text: string
   tokens: DictationToken[]
+  onWordClick?: (word: string) => void
 }): ReactElement {
   const expectedTokens = tokens.filter((token) => token.expected !== null)
   const parts: ReactNode[] = []
@@ -34,14 +36,30 @@ export function DiffedSentence({
     const token = expectedTokens[tokenIndex]
     tokenIndex += 1
     const kind = token?.kind ?? 'correct'
-    const title =
-      token && (token.kind === 'typo' || token.kind === 'wrong')
-        ? `你写的是：${token.actual}`
-        : undefined
+    const titleParts: string[] = []
+    if (token && (token.kind === 'typo' || token.kind === 'wrong')) {
+      titleParts.push(`你写的是：${token.actual}`)
+    }
+    if (onWordClick) titleParts.push('点击查看释义、加入生词本')
+    const title = titleParts.length ? titleParts.join(' · ') : undefined
+    const className = `diff-token diff-${kind}${onWordClick ? ' diff-clickable' : ''}`
+    const word = match[0]
     parts.push(
-      <span key={`word-${match.index}`} className={`diff-token diff-${kind}`} title={title}>
-        {match[0]}
-      </span>
+      onWordClick ? (
+        <button
+          type="button"
+          key={`word-${match.index}`}
+          className={className}
+          title={title}
+          onClick={() => onWordClick(word)}
+        >
+          {word}
+        </button>
+      ) : (
+        <span key={`word-${match.index}`} className={className} title={title}>
+          {word}
+        </span>
+      )
     )
     lastIndex = match.index + match[0].length
   }
