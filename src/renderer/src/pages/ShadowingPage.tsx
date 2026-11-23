@@ -203,12 +203,21 @@ export default function ShadowingPage(): ReactElement {
     let cancelled = false
     setLoading(true)
     setLoadError(null)
-    Promise.all([api.material(id), api.sentences(id)])
-      .then(([nextMaterial, nextSentences]) => {
+    Promise.all([
+      api.material(id),
+      api.sentences(id),
+      api.progress('shadowing', id).catch(() => null)
+    ])
+      .then(([nextMaterial, nextSentences, saved]) => {
         if (cancelled) return
         setMaterial(nextMaterial)
         setSentences(nextSentences)
-        setIndex(0)
+        const savedIndex = saved?.sentence_id
+          ? nextSentences.findIndex(
+              (sentence) => sentence.id === saved.sentence_id
+            )
+          : -1
+        setIndex(savedIndex >= 0 ? savedIndex : 0)
       })
       .catch((error) => {
         if (!cancelled) setLoadError(errorMessage(error))
@@ -220,6 +229,18 @@ export default function ShadowingPage(): ReactElement {
       cancelled = true
     }
   }, [id])
+
+  useEffect(() => {
+    if (!material || !currentSentence) return
+    void api
+      .saveProgress(
+        'shadowing',
+        material.id,
+        currentSentence.id,
+        currentSentence.idx
+      )
+      .catch(() => undefined)
+  }, [material?.id, currentSentence?.id])
 
   useEffect(() => {
     if (!currentSentence) {
@@ -656,13 +677,17 @@ export default function ShadowingPage(): ReactElement {
     }
   }
 
-  const moveSentence = (delta: number): void => {
+  const jumpToSentence = (target: number): void => {
     if (busy) return
-    const next = Math.max(0, Math.min(sentences.length - 1, index + delta))
+    const next = Math.max(0, Math.min(sentences.length - 1, target))
     if (next !== index) {
       stopBoth()
       setIndex(next)
     }
+  }
+
+  const moveSentence = (delta: number): void => {
+    jumpToSentence(index + delta)
   }
 
   if (loading) {
@@ -747,6 +772,19 @@ export default function ShadowingPage(): ReactElement {
           </div>
         </div>
         <div className="shadow-header-actions">
+          <select
+            className="sentence-jump"
+            value={index}
+            onChange={(event) => jumpToSentence(Number(event.target.value))}
+            disabled={busy}
+            title="跳到指定句子"
+          >
+            {sentences.map((sentence, sentenceIndex) => (
+              <option key={sentence.id} value={sentenceIndex}>
+                第 {sentenceIndex + 1} 句 · {sentence.text.slice(0, 40)}
+              </option>
+            ))}
+          </select>
           <button
             className="btn-icon"
             title="上一句"

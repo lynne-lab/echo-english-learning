@@ -30,6 +30,7 @@ import type {
   DictationGrade,
   DictationItem,
   DictationMode,
+  DictationProgress,
   DictationSession,
   DictionaryEntry,
   Material
@@ -156,6 +157,7 @@ export default function DictationPage(): ReactElement {
   const [mode, setMode] = useState<DictationMode>('full')
   const [count, setCount] = useState(10)
   const [starting, setStarting] = useState(false)
+  const [progress, setProgress] = useState<DictationProgress | null>(null)
   const [session, setSession] = useState<DictationSession | null>(null)
   const [index, setIndex] = useState(0)
   const [userText, setUserText] = useState('')
@@ -182,6 +184,23 @@ export default function DictationPage(): ReactElement {
   const lookupSeqRef = useRef(0)
 
   const currentItem = session?.items[index] ?? null
+
+  useEffect(() => {
+    if (phase !== 'setup' || !material) return
+    let cancelled = false
+    setProgress(null)
+    api
+      .dictationProgress(material.id, mode)
+      .then((value) => {
+        if (!cancelled) setProgress(value)
+      })
+      .catch(() => {
+        if (!cancelled) setProgress(null)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [phase, material?.id, mode])
 
   useEffect(() => {
     if (!id) return
@@ -404,6 +423,21 @@ export default function DictationPage(): ReactElement {
     }
   }
 
+  const jumpTo = (target: number): void => {
+    if (!session) return
+    const nextIndex = Math.max(
+      0,
+      Math.min(session.items.length - 1, target)
+    )
+    if (nextIndex === index) return
+    audioRef.current?.pause()
+    setAudioPlaying(false)
+    closeWordPanel()
+    setIndex(nextIndex)
+    setUserText('')
+    setGrade(null)
+  }
+
   const next = (): void => {
     if (!session) return
     closeWordPanel()
@@ -495,8 +529,14 @@ export default function DictationPage(): ReactElement {
   }
 
   if (phase === 'setup') {
-    const willUse =
-      count === 0 || count >= material.sentence_count ? material.sentence_count : count
+    const total = material.sentence_count
+    const allSentences = count === 0 || count >= total
+    const nextIdx = progress?.next_idx ?? 0
+    const remaining = Math.max(0, total - nextIdx)
+    const willUse = allSentences
+      ? total
+      : Math.min(count, remaining > 0 ? remaining : count)
+    const startNumber = allSentences ? 1 : nextIdx + 1
     return (
       <div className="page dictation-page">
         <header className="dictation-header">
@@ -564,9 +604,13 @@ export default function DictationPage(): ReactElement {
                 ))}
               </div>
               <p className="hint">
-                {willUse >= material.sentence_count
-                  ? `本次将练习全部 ${material.sentence_count} 句。`
-                  : `将从 ${material.sentence_count} 句中随机抽取 ${willUse} 句，按原文顺序练习。`}
+                {allSentences
+                  ? `本次将练习全部 ${total} 句。`
+                  : progress?.restart
+                    ? `已完成一轮，本次将从第 1 句开始，共 ${willUse} 句。`
+                    : progress && progress.completed > 0
+                      ? `已练完 ${progress.completed}/${total} 句。本次从第 ${startNumber} 句开始，共 ${willUse} 句。`
+                      : `本次从第 ${startNumber} 句开始，按原文顺序练习 ${willUse} 句。`}
               </p>
             </div>
 
@@ -705,9 +749,19 @@ export default function DictationPage(): ReactElement {
           <div className="player-meta">
             <span>{mode === 'full' ? '整句默写' : '抠词默写'}</span>
             <span className="dot-separator">·</span>
-            <span>
-              第 {index + 1} / {session.items.length} 句
-            </span>
+            <select
+              className="sentence-jump"
+              value={index}
+              onChange={(event) => jumpTo(Number(event.target.value))}
+              title="跳到指定句子"
+            >
+              {session.items.map((item, itemIndex) => (
+                <option key={item.sentence_id} value={itemIndex}>
+                  第 {itemIndex + 1} / {session.items.length} 句 ·{' '}
+                  {item.text.slice(0, 32)}
+                </option>
+              ))}
+            </select>
           </div>
         </div>
         <div className="dictation-header-progress">

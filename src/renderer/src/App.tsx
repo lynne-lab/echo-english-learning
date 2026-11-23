@@ -9,6 +9,7 @@ import DictationPage from './pages/DictationPage'
 import LibraryPage from './pages/LibraryPage'
 import PlanPage from './pages/PlanPage'
 import PlayerPage from './pages/PlayerPage'
+import PracticeHomePage from './pages/PracticeHomePage'
 import ReviewPage from './pages/ReviewPage'
 import SettingsPage from './pages/SettingsPage'
 import ShadowingPage from './pages/ShadowingPage'
@@ -59,6 +60,14 @@ function Shell(): ReactElement {
           <Route path="/" element={<Navigate to="/library" replace />} />
           <Route path="/library" element={<LibraryPage />} />
           <Route path="/plan" element={<PlanPage />} />
+          <Route
+            path="/listening"
+            element={<PracticeHomePage mode="player" />}
+          />
+          <Route
+            path="/shadowing"
+            element={<PracticeHomePage mode="shadowing" />}
+          />
           <Route path="/player/:id" element={<PlayerPage />} />
           <Route path="/review" element={<ReviewPage />} />
           <Route path="/dictation" element={<DictationHomePage />} />

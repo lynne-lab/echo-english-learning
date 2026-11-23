@@ -207,6 +207,61 @@ def _session_payload(row: Any, include_items: bool = True) -> dict[str, Any]:
     return payload
 
 
+def _dictation_progress(material_id: str, mode: str) -> dict[str, Any]:
+    """Sequential progress: the first sentence not yet attempted in this mode."""
+    sentences = db.list_sentences(material_id)
+    total = len(sentences)
+    if total == 0:
+        return {"total": 0, "completed": 0, "next_idx": 0, "restart": False}
+
+    with db.get_conn() as conn:
+        rows = conn.execute(
+            """
+            SELECT DISTINCT a.sentence_id
+            FROM dictation_attempts a
+            JOIN dictation_sessions s ON s.id = a.session_id
+            WHERE a.material_id = ? AND s.mode = ?
+            """,
+            (material_id, mode),
+        ).fetchall()
+    attempted = {row["sentence_id"] for row in rows}
+    completed = sum(1 for sentence in sentences if sentence["id"] in attempted)
+
+    if completed >= total:
+        return {
+            "total": total,
+            "completed": completed,
+            "next_idx": 0,
+            "restart": True,
+        }
+
+    next_idx = next(
+        (
+            int(sentence["idx"])
+            for sentence in sentences
+            if sentence["id"] not in attempted
+        ),
+        0,
+    )
+    return {
+        "total": total,
+        "completed": completed,
+        "next_idx": next_idx,
+        "restart": False,
+    }
+
+
+@router.get("/progress")
+def dictation_progress(
+    material_id: str, mode: str = "full"
+) -> dict[str, Any]:
+    if mode not in ("full", "cloze"):
+        raise HTTPException(status_code=400, detail="不支持的默写方式")
+    if not db.get_material(material_id):
+        raise HTTPException(status_code=404, detail="素材不存在")
+    return _dictation_progress(material_id, mode)
+
+
 class CreateSession(BaseModel):
     material_id: str
     mode: str = Field(pattern="^(full|cloze)$")
@@ -226,10 +281,21 @@ def create_session(payload: CreateSession) -> dict[str, Any]:
         raise HTTPException(status_code=400, detail="这个素材还没有可默写的句子")
 
     if 0 < payload.count < len(sentences):
-        chosen = sorted(
-            random.SystemRandom().sample(sentences, payload.count),
-            key=lambda sentence: sentence["idx"],
+        progress = _dictation_progress(payload.material_id, payload.mode)
+        start_idx = int(progress["next_idx"])
+        start_pos = next(
+            (
+                position
+                for position, sentence in enumerate(sentences)
+                if int(sentence["idx"]) >= start_idx
+            ),
+            0,
         )
+        # Continue from the first unfinished sentence; at the end of the
+        # material the session is simply shorter than the requested count.
+        chosen = sentences[start_pos : start_pos + payload.count]
+        if not chosen:
+            chosen = sentences[: payload.count]
     else:
         chosen = sentences
 

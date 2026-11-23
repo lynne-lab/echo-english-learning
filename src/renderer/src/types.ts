@@ -153,6 +153,21 @@ export interface DictationItem {
   cloze_segments?: ClozeSegment[]
 }
 
+export interface DictationProgress {
+  total: number
+  completed: number
+  next_idx: number
+  restart: boolean
+}
+
+export interface LearningProgress {
+  module: string
+  material_id: string
+  sentence_id: string | null
+  sentence_idx: number | null
+  updated_at: string
+}
+
 export interface DictationSessionSummary {
   id: string
   material_id: string

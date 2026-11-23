@@ -656,6 +656,20 @@
   font-size: 11px;
 }
 
+.practice-plan-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: 8px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: rgba(94, 234, 212, 0.12);
+  color: var(--accent);
+  font-size: 10px;
+  font-weight: 500;
+  vertical-align: middle;
+}
+
 .session-empty {
   padding: 26px 10px;
   color: var(--faint);

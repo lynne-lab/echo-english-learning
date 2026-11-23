@@ -146,6 +146,15 @@ CREATE TABLE IF NOT EXISTS settings (
     value TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS learning_progress (
+    module TEXT NOT NULL,
+    material_id TEXT NOT NULL,
+    sentence_id TEXT,
+    sentence_idx INTEGER,
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY (module, material_id)
+);
+
 CREATE TABLE IF NOT EXISTS study_plans (
     id TEXT PRIMARY KEY,
     start_date TEXT NOT NULL,

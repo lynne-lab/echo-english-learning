@@ -62,6 +62,7 @@ export default function PlayerPage(): ReactElement {
   const [showSubtitle, setShowSubtitle] = useState(true)
   const [showTranscript, setShowTranscript] = useState(true)
   const [mediaError, setMediaError] = useState<string | null>(null)
+  const [progressReady, setProgressReady] = useState(false)
 
   const [editingTitle, setEditingTitle] = useState(false)
   const [titleDraft, setTitleDraft] = useState('')
@@ -77,6 +78,7 @@ export default function PlayerPage(): ReactElement {
   const mediaRef = useRef<HTMLVideoElement | HTMLAudioElement | null>(null)
   const frameRef = useRef<HTMLDivElement | null>(null)
   const rowRefs = useRef<Map<string, HTMLDivElement>>(new Map())
+  const pendingSeekRef = useRef<number | null>(null)
 
   useEffect(() => {
     if (!id) return
@@ -92,6 +94,8 @@ export default function PlayerPage(): ReactElement {
     setMediaError(null)
     setSelected(null)
     setEditingId(null)
+    setProgressReady(false)
+    pendingSeekRef.current = null
 
     const tick = async (): Promise<void> => {
       try {
@@ -102,11 +106,37 @@ export default function PlayerPage(): ReactElement {
         setLoading(false)
 
         if (nextMaterial.status === 'ready') {
-          const nextSentences = await api.sentences(id)
+          const [nextSentences, saved] = await Promise.all([
+            api.sentences(id),
+            api.progress('player', id).catch(() => null)
+          ])
           if (cancelled) return
           setSentences(nextSentences)
           const last = nextSentences[nextSentences.length - 1]
           if (!nextMaterial.duration && last) setDuration(last.end)
+          if (saved) {
+            const target =
+              nextSentences.find(
+                (sentence) => sentence.id === saved.sentence_id
+              ) ??
+              nextSentences.find(
+                (sentence) => sentence.idx === saved.sentence_idx
+              )
+            if (target) {
+              pendingSeekRef.current = target.start
+              const media = mediaRef.current
+              if (
+                media &&
+                media.readyState >= 1 &&
+                media.getAttribute('src') === mediaUrl(nextMaterial.id)
+              ) {
+                pendingSeekRef.current = null
+                media.currentTime = target.start
+                setCurrentTime(target.start)
+              }
+            }
+          }
+          setProgressReady(true)
         } else if (nextMaterial.status === 'processing') {
           timer = window.setTimeout(() => {
             void tick()
@@ -163,6 +193,7 @@ export default function PlayerPage(): ReactElement {
   const selectSentence = useCallback(
     (sentence: Sentence): void => {
       if (editingId === sentence.id) return
+      pendingSeekRef.current = null
       seekTo(sentence.start)
       playMedia()
     },
@@ -222,7 +253,34 @@ export default function PlayerPage(): ReactElement {
     if (Number.isFinite(media.duration) && media.duration > 0) {
       setDuration(media.duration)
     }
+    if (pendingSeekRef.current !== null) {
+      const target = Math.max(
+        0,
+        Math.min(
+          pendingSeekRef.current,
+          Number.isFinite(media.duration) ? media.duration : pendingSeekRef.current
+        )
+      )
+      pendingSeekRef.current = null
+      media.currentTime = target
+      setCurrentTime(target)
+    }
   }
+
+  useEffect(() => {
+    if (!material || !activeSentence || !progressReady) return
+    const timer = window.setTimeout(() => {
+      void api
+        .saveProgress(
+          'player',
+          material.id,
+          activeSentence.id,
+          activeSentence.idx
+        )
+        .catch(() => undefined)
+    }, 400)
+    return () => window.clearTimeout(timer)
+  }, [material?.id, activeSentence?.id, progressReady])
 
   useEffect(() => {
     const media = mediaRef.current
@@ -502,6 +560,25 @@ export default function PlayerPage(): ReactElement {
         </div>
 
         <div className="player-header-actions">
+          {material.status === 'ready' && sentences.length > 0 && activeSentence ? (
+            <select
+              className="sentence-jump"
+              value={activeSentence.id}
+              onChange={(event) => {
+                const target = sentences.find(
+                  (sentence) => sentence.id === event.target.value
+                )
+                if (target) selectSentence(target)
+              }}
+              title="跳到指定句子"
+            >
+              {sentences.map((sentence, sentenceIndex) => (
+                <option key={sentence.id} value={sentence.id}>
+                  第 {sentenceIndex + 1} 句 · {sentence.text.slice(0, 40)}
+                </option>
+              ))}
+            </select>
+          ) : null}
           {material.status === 'ready' && sentences.length > 0 ? (
             <>
               <button

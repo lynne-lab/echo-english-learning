@@ -1,11 +1,13 @@
 import { useEffect, useState, type ReactElement } from 'react'
-import { NavLink } from 'react-router-dom'
+import { NavLink, useLocation } from 'react-router-dom'
 import {
   Activity,
   AudioLines,
   BookMarked,
   CalendarRange,
+  Headphones,
   LibraryBig,
+  Mic,
   PenLine,
   Repeat2,
   Settings2,
@@ -16,6 +18,8 @@ import { api } from '../api'
 const items = [
   { to: '/library', label: '素材库', icon: LibraryBig },
   { to: '/plan', label: '学习计划', icon: CalendarRange },
+  { to: '/listening', label: '精听', icon: Headphones, match: ['/player/'] },
+  { to: '/shadowing', label: '跟读', icon: Mic, match: ['/shadow/'] },
   { to: '/review', label: '今日复习', icon: Repeat2, badge: true },
   { to: '/dictation', label: '默写', icon: PenLine },
   { to: '/words', label: '生词本', icon: BookMarked },
@@ -24,6 +28,7 @@ const items = [
 ]
 
 export default function Sidebar(): ReactElement {
+  const { pathname } = useLocation()
   const [dueCount, setDueCount] = useState(0)
 
   useEffect(() => {
@@ -68,11 +73,17 @@ export default function Sidebar(): ReactElement {
       </div>
 
       <nav className="nav">
-        {items.map(({ to, label, icon: Icon, badge }) => (
+        {items.map(({ to, label, icon: Icon, badge, match }) => (
           <NavLink
             key={to}
             to={to}
-            className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}
+            className={({ isActive }) =>
+              `nav-item${
+                isActive || match?.some((prefix) => pathname.startsWith(prefix))
+                  ? ' active'
+                  : ''
+              }`
+            }
           >
             <Icon size={18} strokeWidth={1.9} />
             <span>{label}</span>
@@ -88,7 +99,7 @@ export default function Sidebar(): ReactElement {
           <ShieldCheck size={15} />
           <span>本地运行 · 离线优先</span>
         </div>
-        <div className="version">v0.6.2 · 发音评测</div>
+        <div className="version">v0.7.0 · 学习进度</div>
       </div>
     </aside>
   )

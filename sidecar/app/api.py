@@ -17,6 +17,7 @@ from . import config, db, dictionary, jobs, srs
 from .dictation_api import router as dictation_router
 from .media import ALLOWED_EXTENSIONS, ffmpeg_available, probe_media
 from .plan_api import router as plan_router
+from .progress_api import router as progress_router
 from .recordings_api import router as recordings_router
 from .reviews_api import router as reviews_router
 from .stats_api import router as stats_router
@@ -33,7 +34,7 @@ MODEL_IDS = {model["id"] for model in WHISPER_MODELS}
 # Bump when the clip extraction logic changes so stale WAVs are ignored.
 CLIP_VERSION = 2
 
-app = FastAPI(title="Echo Sidecar", version="0.6.2")
+app = FastAPI(title="Echo Sidecar", version="0.7.0")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -46,6 +47,7 @@ app.include_router(dictation_router)
 app.include_router(stats_router)
 app.include_router(recordings_router)
 app.include_router(plan_router)
+app.include_router(progress_router)
 
 
 # ---------------------------------------------------------------- 基础信息
@@ -55,7 +57,7 @@ app.include_router(plan_router)
 def health() -> dict[str, Any]:
     return {
         "ok": True,
-        "version": "0.6.2",
+        "version": "0.7.0",
         "whisper_model": db.get_setting("whisper_model", "small.en"),
         "device": runtime.get("device") or "auto",
         "model_loaded": runtime.get("model"),

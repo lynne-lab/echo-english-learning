@@ -2,10 +2,12 @@ import type {
   AppSettings,
   DictationGrade,
   DictationMode,
+  DictationProgress,
   DictationSession,
   DictationSessionSummary,
   DictionaryEntry,
   Health,
+  LearningProgress,
   Material,
   PronunciationFeedback,
   Recording,
@@ -192,6 +194,28 @@ export const api = {
     request<PronunciationFeedback>(`/api/recordings/${recordingId}/azure-score`, {
       method: 'POST'
     }),
+
+  progress: (module: 'player' | 'shadowing', materialId: string) =>
+    request<LearningProgress | null>(`/api/progress/${module}/${materialId}`),
+  progressList: (module: 'player' | 'shadowing') =>
+    request<LearningProgress[]>(`/api/progress/${module}`),
+  saveProgress: (
+    module: 'player' | 'shadowing',
+    materialId: string,
+    sentenceId: string,
+    sentenceIdx: number
+  ) =>
+    request<LearningProgress>(`/api/progress/${module}/${materialId}`, {
+      method: 'PUT',
+      body: JSON.stringify({
+        sentence_id: sentenceId,
+        sentence_idx: sentenceIdx
+      })
+    }),
+  dictationProgress: (materialId: string, mode: DictationMode) =>
+    request<DictationProgress>(
+      `/api/dictation/progress?material_id=${encodeURIComponent(materialId)}&mode=${mode}`
+    ),
 
   studyPlan: () => request<StudyPlanResponse>('/api/plan'),
   startStudyPlan: (materialId: string | null) =>

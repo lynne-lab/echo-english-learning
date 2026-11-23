@@ -61,6 +61,7 @@ hiddenimports += [
     "sidecar.app.dictation_api",
     "sidecar.app.recordings_api",
     "sidecar.app.plan_api",
+    "sidecar.app.progress_api",
     "sidecar.app.stats_api",
     "sidecar.app.srs",
     "sidecar.app.cuda",
