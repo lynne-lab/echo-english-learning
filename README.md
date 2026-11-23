@@ -2,7 +2,7 @@
 
 Windows 桌面英语听力/口语学习软件。把本地音视频或网页链接变成**可逐句精听**的时间轴字幕，点词查释义、带原声保存生词；用 **FSRS 间隔重复**复习生词，用**默写自动批改**检验听写，用**学习统计**看长期进步。
 
-当前版本：**v0.7.0 · 学习进度与句子跳转 + 腾讯云智聆发音评测**。
+当前版本：**v0.7.1 · 学习进度与句子跳转 + 腾讯云智聆发音评测**。
 
 ## 已完成的功能
 
@@ -221,7 +221,7 @@ npm run dist
 ```
 
 - `build:sidecar` 用 PyInstaller 冻结 Python 引擎，并把 cuBLAS / cuDNN / ffmpeg / ffprobe 一起放进 `sidecar-dist/`
-- `dist` 用 electron-builder 生成 `release/Echo-Setup-0.7.0.exe`
+- `dist` 用 electron-builder 生成 `release/Echo-Setup-0.7.1.exe`
 - 也可以直接运行 `powershell -File scripts/build-installer.ps1` 一步完成
 - 安装包约 **1.4 GB**（含 CUDA 运行库和 ffmpeg），安装后约 **3.1 GB**
 - 安装包未签名，Windows SmartScreen 可能提示；选择「仍要运行」

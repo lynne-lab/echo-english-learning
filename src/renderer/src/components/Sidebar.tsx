@@ -99,7 +99,7 @@ export default function Sidebar(): ReactElement {
           <ShieldCheck size={15} />
           <span>本地运行 · 离线优先</span>
         </div>
-        <div className="version">v0.7.0 · 学习进度</div>
+        <div className="version">v0.7.1 · 学习进度</div>
       </div>
     </aside>
   )
