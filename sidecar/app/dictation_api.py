@@ -590,6 +590,15 @@ def submit_attempt(session_id: str, payload: AttemptRequest) -> dict[str, Any]:
         completed_at = session["completed_at"]
         if completed >= session["item_count"] and not completed_at:
             completed_at = now
+            # Finishing this session supersedes any older unfinished ones.
+            conn.execute(
+                """
+                UPDATE dictation_sessions
+                SET completed_at = COALESCE(completed_at, ?)
+                WHERE completed_at IS NULL AND id != ?
+                """,
+                (now, session_id),
+            )
 
         conn.execute(
             """
