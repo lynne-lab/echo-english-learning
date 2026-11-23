@@ -1,5 +1,9 @@
 import { useEffect, useState, type ReactElement } from 'react'
-import { NavLink, useLocation } from 'react-router-dom'
+import {
+  NavLink,
+  useLocation,
+  useNavigate
+} from 'react-router-dom'
 import {
   Activity,
   AudioLines,
@@ -29,7 +33,28 @@ const items = [
 
 export default function Sidebar(): ReactElement {
   const { pathname } = useLocation()
+  const navigate = useNavigate()
   const [dueCount, setDueCount] = useState(0)
+  const [dictationPath, setDictationPath] = useState<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    api
+      .dictationActive()
+      .then((active) => {
+        if (!cancelled) {
+          setDictationPath(
+            active
+              ? `/dictation/${active.material_id}?session=${active.id}`
+              : null
+          )
+        }
+      })
+      .catch(() => undefined)
+    return () => {
+      cancelled = true
+    }
+  }, [pathname])
 
   useEffect(() => {
     let cancelled = false
@@ -77,6 +102,15 @@ export default function Sidebar(): ReactElement {
           <NavLink
             key={to}
             to={to}
+            onClick={(event) => {
+              if (to !== '/dictation' || !dictationPath) return
+              if (pathname.startsWith('/dictation')) {
+                event.preventDefault()
+                return
+              }
+              event.preventDefault()
+              navigate(dictationPath)
+            }}
             className={({ isActive }) =>
               `nav-item${
                 isActive || match?.some((prefix) => pathname.startsWith(prefix))
@@ -99,7 +133,7 @@ export default function Sidebar(): ReactElement {
           <ShieldCheck size={15} />
           <span>本地运行 · 离线优先</span>
         </div>
-        <div className="version">v0.7.1 · 学习进度</div>
+        <div className="version">v0.8.0 · 断点续学</div>
       </div>
     </aside>
   )

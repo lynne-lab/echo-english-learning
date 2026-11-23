@@ -4,11 +4,13 @@ import type {
   DictationMode,
   DictationProgress,
   DictationSession,
+  DictationSessionDetail,
   DictationSessionSummary,
   DictionaryEntry,
   Health,
   LearningProgress,
   Material,
+  ModuleState,
   PronunciationFeedback,
   Recording,
   RecordingFeedback,
@@ -167,7 +169,17 @@ export const api = {
   dictationSessions: () =>
     request<DictationSessionSummary[]>('/api/dictation/sessions'),
   dictationSession: (sessionId: string) =>
-    request<DictationSession & { attempts: unknown[] }>(`/api/dictation/sessions/${sessionId}`),
+    request<DictationSessionDetail>(`/api/dictation/sessions/${sessionId}`),
+  dictationActive: () =>
+    request<DictationSession | null>('/api/dictation/active'),
+  saveDictationPosition: (sessionId: string, index: number) =>
+    request<{ ok: boolean; last_index: number }>(
+      `/api/dictation/sessions/${sessionId}/position`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify({ index })
+      }
+    ),
   deleteDictationSession: (sessionId: string) =>
     request<{ ok: boolean }>(`/api/dictation/sessions/${sessionId}`, { method: 'DELETE' }),
 
@@ -203,14 +215,26 @@ export const api = {
     module: 'player' | 'shadowing',
     materialId: string,
     sentenceId: string,
-    sentenceIdx: number
+    sentenceIdx: number,
+    position?: number | null
   ) =>
     request<LearningProgress>(`/api/progress/${module}/${materialId}`, {
       method: 'PUT',
       body: JSON.stringify({
         sentence_id: sentenceId,
-        sentence_idx: sentenceIdx
+        sentence_idx: sentenceIdx,
+        position
       })
+    }),
+  moduleState: <T = Record<string, unknown>>(module: string) =>
+    request<ModuleState<T> | null>(`/api/module-state/${module}`),
+  saveModuleState: <T = Record<string, unknown>>(
+    module: string,
+    state: T
+  ) =>
+    request<ModuleState<T>>(`/api/module-state/${module}`, {
+      method: 'PUT',
+      body: JSON.stringify({ state })
     }),
   dictationProgress: (materialId: string, mode: DictationMode) =>
     request<DictationProgress>(

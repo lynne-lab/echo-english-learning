@@ -104,7 +104,9 @@ CREATE TABLE IF NOT EXISTS dictation_sessions (
     word_correct INTEGER NOT NULL DEFAULT 0,
     accuracy REAL NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL,
-    completed_at TEXT
+    completed_at TEXT,
+    last_index INTEGER NOT NULL DEFAULT 0,
+    last_active_at TEXT
 );
 
 CREATE TABLE IF NOT EXISTS dictation_attempts (
@@ -151,8 +153,15 @@ CREATE TABLE IF NOT EXISTS learning_progress (
     material_id TEXT NOT NULL,
     sentence_id TEXT,
     sentence_idx INTEGER,
+    position REAL,
     updated_at TEXT NOT NULL,
     PRIMARY KEY (module, material_id)
+);
+
+CREATE TABLE IF NOT EXISTS module_state (
+    module TEXT PRIMARY KEY,
+    state_json TEXT NOT NULL,
+    updated_at TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS study_plans (
@@ -235,6 +244,23 @@ def init_db() -> None:
         # Phase 3/4 migration: optional Azure pronunciation assessment result.
         _ensure_column(conn, "recordings", "azure_json", "TEXT")
         _ensure_column(conn, "recordings", "azure_scored_at", "TEXT")
+
+        # v0.8: resumable dictation sessions and exact listening position.
+        _ensure_column(
+            conn,
+            "dictation_sessions",
+            "last_index",
+            "INTEGER NOT NULL DEFAULT 0",
+        )
+        _ensure_column(conn, "dictation_sessions", "last_active_at", "TEXT")
+        _ensure_column(conn, "learning_progress", "position", "REAL")
+        conn.execute(
+            """
+            UPDATE dictation_sessions
+            SET last_active_at = created_at
+            WHERE last_active_at IS NULL
+            """
+        )
 
         conn.execute(
             "INSERT OR IGNORE INTO settings(key, value) VALUES('whisper_model', 'small.en')"

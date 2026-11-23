@@ -68,7 +68,10 @@ export default function PlayerPage(): ReactElement {
     materialId: string
     sentenceId: string
     idx: number
+    position: number
   } | null>(null)
+  const savePositionRef = useRef<() => void>(() => {})
+  const progressDecisionRef = useRef(false)
 
   const [editingTitle, setEditingTitle] = useState(false)
   const [titleDraft, setTitleDraft] = useState('')
@@ -102,6 +105,7 @@ export default function PlayerPage(): ReactElement {
     setEditingId(null)
     setProgressReady(false)
     progressReadyRef.current = false
+    progressDecisionRef.current = false
     pendingSeekRef.current = null
 
     const tick = async (): Promise<void> => {
@@ -130,8 +134,12 @@ export default function PlayerPage(): ReactElement {
               nextSentences.find(
                 (sentence) => sentence.idx === saved.sentence_idx
               )
-            if (target) {
-              pendingSeekRef.current = target.start
+            const resumePosition =
+              typeof saved.position === 'number'
+                ? saved.position
+                : target?.start ?? null
+            if (resumePosition !== null) {
+              pendingSeekRef.current = resumePosition
               restorePending = true
               const media = mediaRef.current
               if (
@@ -140,12 +148,13 @@ export default function PlayerPage(): ReactElement {
                 media.getAttribute('src') === mediaUrl(nextMaterial.id)
               ) {
                 pendingSeekRef.current = null
-                media.currentTime = target.start
-                setCurrentTime(target.start)
+                media.currentTime = resumePosition
+                setCurrentTime(resumePosition)
                 restorePending = false
               }
             }
           }
+          progressDecisionRef.current = true
           if (!restorePending) {
             setProgressReady(true)
             progressReadyRef.current = true
@@ -278,21 +287,73 @@ export default function PlayerPage(): ReactElement {
       media.currentTime = target
       setCurrentTime(target)
     }
-    // The saved position has been applied (or there was none); progress can
-    // now be written without overwriting the previous position.
-    setProgressReady(true)
-    progressReadyRef.current = true
+    // Only start writing progress once the saved position is known, so a
+    // late restore cannot overwrite it with the first sentence.
+    if (progressDecisionRef.current) {
+      setProgressReady(true)
+      progressReadyRef.current = true
+    }
   }
+
+  useEffect(() => {
+    if (!id) return
+    const media = mediaRef.current
+    if (!media || pendingSeekRef.current === null) return
+    if (
+      media.readyState >= 1 &&
+      media.getAttribute('src') === mediaUrl(id)
+    ) {
+      const target = pendingSeekRef.current
+      pendingSeekRef.current = null
+      media.currentTime = target
+      setCurrentTime(target)
+      setProgressReady(true)
+      progressReadyRef.current = true
+    }
+  }, [sentences, id])
 
   useEffect(() => {
     if (material && activeSentence) {
       latestProgressRef.current = {
         materialId: material.id,
         sentenceId: activeSentence.id,
-        idx: activeSentence.idx
+        idx: activeSentence.idx,
+        position:
+          mediaRef.current?.currentTime ?? activeSentence.start
       }
     }
   }, [material?.id, activeSentence?.id])
+
+  useEffect(() => {
+    savePositionRef.current = () => {
+      const media = mediaRef.current
+      if (!media || !material || !progressReady) return
+      const position = media.currentTime
+      const sentence =
+        sentences.find(
+          (item) =>
+            position >= item.start - 0.06 && position < item.end + 0.1
+        ) ?? activeSentence
+      if (!sentence) return
+      void api
+        .saveProgress(
+          'player',
+          material.id,
+          sentence.id,
+          sentence.idx,
+          position
+        )
+        .catch(() => undefined)
+    }
+  })
+
+  useEffect(() => {
+    if (!progressReady) return
+    const timer = window.setInterval(() => {
+      if (!mediaRef.current?.paused) savePositionRef.current()
+    }, 5000)
+    return () => window.clearInterval(timer)
+  }, [progressReady])
 
   useEffect(() => {
     return () => {
@@ -303,7 +364,8 @@ export default function PlayerPage(): ReactElement {
           'player',
           latest.materialId,
           latest.sentenceId,
-          latest.idx
+          latest.idx,
+          mediaRef.current?.currentTime ?? latest.position
         )
         .catch(() => undefined)
     }
@@ -317,7 +379,8 @@ export default function PlayerPage(): ReactElement {
           'player',
           material.id,
           activeSentence.id,
-          activeSentence.idx
+          activeSentence.idx,
+          mediaRef.current?.currentTime ?? activeSentence.start
         )
         .catch(() => undefined)
     }, 400)

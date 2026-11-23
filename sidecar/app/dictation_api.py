@@ -196,7 +196,16 @@ def _session_summary(row: Any) -> dict[str, Any]:
         "accuracy": row["accuracy"],
         "created_at": row["created_at"],
         "completed_at": row["completed_at"],
-        "completed": row["completed_count"] >= row["item_count"],
+        "last_index": (
+            row["last_index"] if "last_index" in row.keys() else 0
+        ),
+        "last_active_at": (
+            row["last_active_at"]
+            if "last_active_at" in row.keys()
+            else row["created_at"]
+        ),
+        "completed": bool(row["completed_at"])
+        or row["completed_count"] >= row["item_count"],
     }
 
 
@@ -316,13 +325,23 @@ def create_session(payload: CreateSession) -> dict[str, Any]:
         items.append(item)
 
     with db.get_conn() as conn:
+        # Starting a new session supersedes any older unfinished one.
+        conn.execute(
+            """
+            UPDATE dictation_sessions
+            SET completed_at = COALESCE(completed_at, ?)
+            WHERE completed_at IS NULL
+            """,
+            (now,),
+        )
         conn.execute(
             """
             INSERT INTO dictation_sessions
                 (id, material_id, material_title, mode, item_count, items_json,
                  completed_count, correct_count, word_total, scored_total,
-                 word_correct, accuracy, created_at, completed_at)
-            VALUES (?, ?, ?, ?, ?, ?, 0, 0, 0, 0, 0, 0, ?, NULL)
+                 word_correct, accuracy, created_at, completed_at,
+                 last_index, last_active_at)
+            VALUES (?, ?, ?, ?, ?, ?, 0, 0, 0, 0, 0, 0, ?, NULL, 0, ?)
             """,
             (
                 session_id,
@@ -332,12 +351,80 @@ def create_session(payload: CreateSession) -> dict[str, Any]:
                 len(items),
                 json.dumps(items, ensure_ascii=False),
                 now,
+                now,
             ),
         )
         row = conn.execute(
             "SELECT * FROM dictation_sessions WHERE id = ?", (session_id,)
         ).fetchone()
     return _session_payload(row)
+
+
+class PositionSave(BaseModel):
+    index: int = Field(ge=0)
+
+
+@router.get("/active")
+def active_session() -> dict[str, Any] | None:
+    """The most recently touched unfinished session, if any."""
+    with db.get_conn() as conn:
+        row = conn.execute(
+            """
+            SELECT s.*
+            FROM dictation_sessions s
+            JOIN materials m ON m.id = s.material_id
+            WHERE s.completed_at IS NULL
+            ORDER BY COALESCE(s.last_active_at, s.created_at) DESC
+            LIMIT 1
+            """
+        ).fetchone()
+        if not row:
+            return None
+        attempts = conn.execute(
+            "SELECT sentence_id FROM dictation_attempts WHERE session_id = ?",
+            (row["id"],),
+        ).fetchall()
+
+    payload = _session_payload(row)
+    attempted = {attempt["sentence_id"] for attempt in attempts}
+    # Sessions created before v0.8 have last_index=0; fall back to the first
+    # sentence the learner has not submitted yet.
+    if payload["last_index"] == 0 and attempted:
+        first_open = next(
+            (
+                index
+                for index, item in enumerate(payload["items"])
+                if item["sentence_id"] not in attempted
+            ),
+            None,
+        )
+        if first_open is not None:
+            payload["last_index"] = first_open
+    return payload
+
+
+@router.patch("/sessions/{session_id}/position")
+def save_position(
+    session_id: str, payload: PositionSave
+) -> dict[str, Any]:
+    now = db.now_iso()
+    with db.get_conn() as conn:
+        row = conn.execute(
+            "SELECT item_count FROM dictation_sessions WHERE id = ?",
+            (session_id,),
+        ).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="默写记录不存在")
+        index = min(payload.index, max(0, int(row["item_count"]) - 1))
+        conn.execute(
+            """
+            UPDATE dictation_sessions
+            SET last_index = ?, last_active_at = ?
+            WHERE id = ?
+            """,
+            (index, now, session_id),
+        )
+    return {"ok": True, "last_index": index}
 
 
 @router.get("/sessions")
@@ -386,8 +473,24 @@ def get_session(session_id: str) -> dict[str, Any]:
     payload["attempts"] = []
     for attempt in attempts:
         item = dict(attempt)
-        item["diff"] = json.loads(item.pop("diff_json"))
-        item["errors"] = json.loads(item.pop("errors_json"))
+        diff = json.loads(item.pop("diff_json"))
+        errors = json.loads(item.pop("errors_json"))
+        item["diff"] = diff
+        item["errors"] = errors
+        item["grade"] = {
+            "accuracy": item["accuracy"],
+            "word_total": item["word_total"],
+            "word_correct": item["word_correct"],
+            "scored_total": item["scored_total"],
+            "errors": errors,
+            "tokens": diff.get("tokens", []),
+            "punctuation_ok": diff.get(
+                "punctuation_ok", errors.get("punctuation", 0) == 0
+            ),
+            "expected_punctuation": diff.get("expected_punctuation", ""),
+            "actual_punctuation": diff.get("actual_punctuation", ""),
+            "expected_text": item["sentence_text"],
+        }
         payload["attempts"].append(item)
     return payload
 
@@ -446,7 +549,15 @@ def submit_attempt(session_id: str, payload: AttemptRequest) -> dict[str, Any]:
                 grade["word_total"],
                 grade["scored_total"],
                 grade["word_correct"],
-                json.dumps({"tokens": grade["tokens"]}, ensure_ascii=False),
+                json.dumps(
+                    {
+                        "tokens": grade["tokens"],
+                        "punctuation_ok": grade["punctuation_ok"],
+                        "expected_punctuation": grade["expected_punctuation"],
+                        "actual_punctuation": grade["actual_punctuation"],
+                    },
+                    ensure_ascii=False,
+                ),
                 json.dumps(grade["errors"], ensure_ascii=False),
                 now,
                 now,
@@ -480,7 +591,8 @@ def submit_attempt(session_id: str, payload: AttemptRequest) -> dict[str, Any]:
             """
             UPDATE dictation_sessions
             SET completed_count = ?, correct_count = ?, word_total = ?,
-                scored_total = ?, word_correct = ?, accuracy = ?, completed_at = ?
+                scored_total = ?, word_correct = ?, accuracy = ?,
+                completed_at = ?, last_active_at = ?
             WHERE id = ?
             """,
             (
@@ -491,6 +603,7 @@ def submit_attempt(session_id: str, payload: AttemptRequest) -> dict[str, Any]:
                 word_correct,
                 round(accuracy, 4),
                 completed_at,
+                now,
                 session_id,
             ),
         )

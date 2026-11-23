@@ -17,6 +17,7 @@ VALID_MODULES = {"player", "shadowing"}
 class ProgressSave(BaseModel):
     sentence_id: str | None = None
     sentence_idx: int | None = None
+    position: float | None = None
 
 
 def _check_module(module: str) -> None:
@@ -30,7 +31,8 @@ def list_progress(module: str) -> list[dict[str, Any]]:
     with db.get_conn() as conn:
         rows = conn.execute(
             """
-            SELECT module, material_id, sentence_id, sentence_idx, updated_at
+            SELECT module, material_id, sentence_id, sentence_idx, position,
+                   updated_at
             FROM learning_progress
             WHERE module = ?
             """,
@@ -45,7 +47,8 @@ def get_progress(module: str, material_id: str) -> dict[str, Any] | None:
     with db.get_conn() as conn:
         row = conn.execute(
             """
-            SELECT module, material_id, sentence_id, sentence_idx, updated_at
+            SELECT module, material_id, sentence_id, sentence_idx, position,
+                   updated_at
             FROM learning_progress
             WHERE module = ? AND material_id = ?
             """,
@@ -73,11 +76,13 @@ def save_progress(
         conn.execute(
             """
             INSERT INTO learning_progress
-                (module, material_id, sentence_id, sentence_idx, updated_at)
-            VALUES (?, ?, ?, ?, ?)
+                (module, material_id, sentence_id, sentence_idx, position,
+                 updated_at)
+            VALUES (?, ?, ?, ?, ?, ?)
             ON CONFLICT(module, material_id) DO UPDATE SET
                 sentence_id = excluded.sentence_id,
                 sentence_idx = excluded.sentence_idx,
+                position = excluded.position,
                 updated_at = excluded.updated_at
             """,
             (
@@ -85,12 +90,14 @@ def save_progress(
                 material_id,
                 payload.sentence_id,
                 sentence_idx,
+                payload.position,
                 now,
             ),
         )
         row = conn.execute(
             """
-            SELECT module, material_id, sentence_id, sentence_idx, updated_at
+            SELECT module, material_id, sentence_id, sentence_idx, position,
+                   updated_at
             FROM learning_progress
             WHERE module = ? AND material_id = ?
             """,

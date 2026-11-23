@@ -85,12 +85,30 @@ export default function ReviewPage(): ReactElement {
     setLoading(true)
     setError(null)
     try {
-      const data = await api.reviewQueue(20)
+      const [data, saved] = await Promise.all([
+        api.reviewQueue(20),
+        api
+          .moduleState<{
+            word_id?: string | null
+            revealed?: boolean
+            ratings?: number[]
+          }>('review')
+          .catch(() => null)
+      ])
       setCards(data.cards)
       setSummary(data.summary)
-      setIndex(0)
-      setRevealed(false)
-      setSessionRatings([])
+      const savedState = saved?.state
+      const savedWord = savedState?.word_id ?? null
+      const savedIndex = savedWord
+        ? data.cards.findIndex((card) => card.word_id === savedWord)
+        : -1
+      setIndex(savedIndex >= 0 ? savedIndex : 0)
+      setRevealed(savedIndex >= 0 ? Boolean(savedState?.revealed) : false)
+      setSessionRatings(
+        savedIndex >= 0 && Array.isArray(savedState?.ratings)
+          ? savedState.ratings
+          : []
+      )
       setPreviews([])
       window.dispatchEvent(new Event('echo:review-changed'))
     } catch (loadError) {
@@ -110,7 +128,6 @@ export default function ReviewPage(): ReactElement {
       return
     }
     let cancelled = false
-    setRevealed(false)
     setPreviews([])
     startedAtRef.current = Date.now()
     api
@@ -130,6 +147,17 @@ export default function ReviewPage(): ReactElement {
     setPlaying(false)
     stopAtRef.current = null
   }, [current?.word_id])
+
+  useEffect(() => {
+    if (loading || !current) return
+    void api
+      .saveModuleState('review', {
+        word_id: current.word_id,
+        revealed,
+        ratings: sessionRatings
+      })
+      .catch(() => undefined)
+  }, [loading, current?.word_id, revealed, sessionRatings])
 
   const previewMap = useMemo(() => {
     const map: Record<number, string> = {}
@@ -188,6 +216,7 @@ export default function ReviewPage(): ReactElement {
         setSessionRatings((previous) => [...previous, rating])
         push(`已记录 · 下次复习在 ${result.interval} 后`, 'success')
         setIndex((value) => value + 1)
+        setRevealed(false)
         window.dispatchEvent(new Event('echo:review-changed'))
       } catch (rateError) {
         push(errorMessage(rateError), 'error')

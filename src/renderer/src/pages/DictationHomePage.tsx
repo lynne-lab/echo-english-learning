@@ -12,7 +12,11 @@ import {
 import { api } from '../api'
 import EmptyState from '../components/EmptyState'
 import { useToast } from '../components/Toast'
-import type { DictationSessionSummary, Material } from '../types'
+import type {
+  DictationSession,
+  DictationSessionSummary,
+  Material
+} from '../types'
 import { errorMessage, formatDate, formatDuration } from '../utils'
 
 export default function DictationHomePage(): ReactElement {
@@ -20,6 +24,7 @@ export default function DictationHomePage(): ReactElement {
   const { push } = useToast()
   const [materials, setMaterials] = useState<Material[]>([])
   const [sessions, setSessions] = useState<DictationSessionSummary[]>([])
+  const [active, setActive] = useState<DictationSession | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -27,13 +32,15 @@ export default function DictationHomePage(): ReactElement {
     let cancelled = false
     const load = async (): Promise<void> => {
       try {
-        const [nextMaterials, nextSessions] = await Promise.all([
+        const [nextMaterials, nextSessions, nextActive] = await Promise.all([
           api.materials(),
-          api.dictationSessions()
+          api.dictationSessions(),
+          api.dictationActive().catch(() => null)
         ])
         if (!cancelled) {
           setMaterials(nextMaterials)
           setSessions(nextSessions)
+          setActive(nextActive)
         }
       } catch (loadError) {
         if (!cancelled) setError(errorMessage(loadError))
@@ -79,6 +86,26 @@ export default function DictationHomePage(): ReactElement {
           </Link>
         </div>
       </header>
+
+      {active ? (
+        <section className="panel resume-dictation-card">
+          <div>
+            <div className="eyebrow">CONTINUE</div>
+            <h2>继续上次默写</h2>
+            <p>
+              {active.material_title} · 第 {(active.last_index ?? 0) + 1}/
+              {active.item_count} 句 ·{' '}
+              {active.mode === 'full' ? '整句默写' : '抠词默写'}
+            </p>
+          </div>
+          <Link
+            className="btn btn-primary"
+            to={`/dictation/${active.material_id}?session=${active.id}`}
+          >
+            继续 <ChevronRight size={15} />
+          </Link>
+        </section>
+      ) : null}
 
       <div className="dictation-mode-overview">
         <div className="mode-overview-card">
@@ -145,7 +172,9 @@ export default function DictationHomePage(): ReactElement {
                   </div>
                   <button
                     className="btn btn-small btn-primary"
-                    onClick={() => navigate(`/dictation/${material.id}`)}
+                    onClick={() =>
+                      navigate(`/dictation/${material.id}?new=1`)
+                    }
                   >
                     开始默写 <ChevronRight size={14} />
                   </button>

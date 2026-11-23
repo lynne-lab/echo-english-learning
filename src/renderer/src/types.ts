@@ -165,6 +165,13 @@ export interface LearningProgress {
   material_id: string
   sentence_id: string | null
   sentence_idx: number | null
+  position: number | null
+  updated_at: string
+}
+
+export interface ModuleState<T = Record<string, unknown>> {
+  module: string
+  state: T
   updated_at: string
 }
 
@@ -182,11 +189,35 @@ export interface DictationSessionSummary {
   accuracy: number
   created_at: string
   completed_at: string | null
+  last_index: number
+  last_active_at: string | null
   completed: boolean
 }
 
 export interface DictationSession extends DictationSessionSummary {
   items: DictationItem[]
+}
+
+export interface DictationAttemptDetail {
+  id: string
+  session_id: string
+  material_id: string
+  sentence_id: string
+  sentence_text: string
+  user_text: string
+  accuracy: number
+  word_total: number
+  word_correct: number
+  scored_total: number
+  diff: { tokens: DictationToken[] }
+  errors: DictationErrors
+  grade: DictationGrade
+  created_at: string
+  updated_at: string
+}
+
+export interface DictationSessionDetail extends DictationSession {
+  attempts: DictationAttemptDetail[]
 }
 
 export type DictationTokenKind = 'correct' | 'typo' | 'missing' | 'extra' | 'wrong'
