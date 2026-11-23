@@ -36,6 +36,7 @@ import type { DictionaryEntry, Material, Sentence } from '../types'
 import {
   errorMessage,
   formatDuration,
+  sentencePlaybackEnd,
   speakWord,
   stripWord
 } from '../utils'
@@ -196,10 +197,20 @@ export default function PlayerPage(): ReactElement {
     if (!media) return
     setCurrentTime(media.currentTime)
     if (loopSentenceId) {
-      const target = sentences.find((sentence) => sentence.id === loopSentenceId)
-      if (target && media.currentTime >= target.end - 0.03) {
-        media.currentTime = target.start
-        void media.play().catch(() => undefined)
+      const index = sentences.findIndex(
+        (sentence) => sentence.id === loopSentenceId
+      )
+      const target = index >= 0 ? sentences[index] : null
+      if (target) {
+        const end = sentencePlaybackEnd(
+          target,
+          sentences[index + 1] ?? null,
+          duration
+        )
+        if (media.currentTime >= end) {
+          media.currentTime = target.start
+          void media.play().catch(() => undefined)
+        }
       }
     }
   }

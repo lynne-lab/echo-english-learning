@@ -88,7 +88,7 @@ export default function Sidebar(): ReactElement {
           <ShieldCheck size={15} />
           <span>本地运行 · 离线优先</span>
         </div>
-        <div className="version">v0.6.0 · 发音评测</div>
+        <div className="version">v0.6.1 · 发音评测</div>
       </div>
     </aside>
   )

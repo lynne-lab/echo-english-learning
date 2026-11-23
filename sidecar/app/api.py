@@ -30,8 +30,10 @@ WHISPER_MODELS = [
     {"id": "large-v3", "label": "Large v3", "size": "~3 GB", "note": "最准，建议 GPU"},
 ]
 MODEL_IDS = {model["id"] for model in WHISPER_MODELS}
+# Bump when the clip extraction logic changes so stale WAVs are ignored.
+CLIP_VERSION = 2
 
-app = FastAPI(title="Echo Sidecar", version="0.6.0")
+app = FastAPI(title="Echo Sidecar", version="0.6.1")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -53,7 +55,7 @@ app.include_router(plan_router)
 def health() -> dict[str, Any]:
     return {
         "ok": True,
-        "version": "0.6.0",
+        "version": "0.6.1",
         "whisper_model": db.get_setting("whisper_model", "small.en"),
         "device": runtime.get("device") or "auto",
         "model_loaded": runtime.get("model"),
@@ -193,10 +195,13 @@ def delete_material(material_id: str) -> dict[str, bool]:
             except OSError:
                 pass
         for sentence_id in sentence_ids:
-            try:
-                (config.settings.clips_dir / f"{sentence_id}.wav").unlink(missing_ok=True)
-            except OSError:
-                pass
+            for suffix in (".wav", f".v{CLIP_VERSION}.wav"):
+                try:
+                    (config.settings.clips_dir / f"{sentence_id}{suffix}").unlink(
+                        missing_ok=True
+                    )
+                except OSError:
+                    pass
 
     with db.get_conn() as conn:
         conn.execute("DELETE FROM recordings WHERE material_id = ?", (material_id,))
@@ -311,16 +316,31 @@ def get_sentence_clip(sentence_id: str):
     if config.settings is None:
         raise HTTPException(status_code=500, detail="数据目录未初始化")
 
-    clip_path = config.settings.clips_dir / f"{sentence_id}.wav"
+    clip_path = (
+        config.settings.clips_dir / f"{sentence_id}.v{CLIP_VERSION}.wav"
+    )
     if not clip_path.exists():
+        # Drop the pre-versioned cache entry for this sentence.
+        (config.settings.clips_dir / f"{sentence_id}.wav").unlink(
+            missing_ok=True
+        )
         start = max(0.0, float(sentence["start"]) - 0.1)
+        # Whisper's last word can end a fraction of a second early; keep a
+        # little tail so final consonants are not clipped.
         duration = max(
-            0.3, float(sentence["end"]) - float(sentence["start"]) + 0.2
+            0.3, float(sentence["end"]) - float(sentence["start"]) + 0.45
         )
         temporary = (
             config.settings.clips_dir
             / f"{sentence_id}.{uuid.uuid4().hex}.part.wav"
         )
+        # Input seeking (-ss before -i) can land late on VBR MP3s, so decode
+        # from the start for MP3 and seek accurately. Other containers keep
+        # the faster input seek.
+        if media_path.suffix.lower() == ".mp3":
+            seek_args = ["-i", str(media_path), "-ss", f"{start:.3f}"]
+        else:
+            seek_args = ["-ss", f"{start:.3f}", "-i", str(media_path)]
         try:
             subprocess.run(
                 [
@@ -328,10 +348,7 @@ def get_sentence_clip(sentence_id: str):
                     "-y",
                     "-loglevel",
                     "error",
-                    "-ss",
-                    f"{start:.3f}",
-                    "-i",
-                    str(media_path),
+                    *seek_args,
                     "-t",
                     f"{duration:.3f}",
                     "-vn",

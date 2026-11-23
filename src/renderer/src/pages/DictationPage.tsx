@@ -34,7 +34,13 @@ import type {
   DictionaryEntry,
   Material
 } from '../types'
-import { errorMessage, formatDuration, speakWord, stripWord } from '../utils'
+import {
+  errorMessage,
+  formatDuration,
+  sentencePlaybackEnd,
+  speakWord,
+  stripWord
+} from '../utils'
 
 const COUNT_OPTIONS = [
   { value: 5, label: '5 句' },
@@ -182,6 +188,10 @@ export default function DictationPage(): ReactElement {
   const lookupSeqRef = useRef(0)
 
   const currentItem = session?.items[index] ?? null
+  const nextItem = session?.items[index + 1] ?? null
+  const playbackEnd = currentItem
+    ? sentencePlaybackEnd(currentItem, nextItem, material?.duration)
+    : 0
 
   useEffect(() => {
     if (!id) return
@@ -207,7 +217,7 @@ export default function DictationPage(): ReactElement {
     const audio = audioRef.current
     if (!audio) return
     const target = mediaUrl(material.id)
-    stopAtRef.current = currentItem.end
+    stopAtRef.current = playbackEnd
     const startPlayback = (): void => {
       audio.playbackRate = speed
       audio.currentTime = currentItem.start
@@ -254,7 +264,7 @@ export default function DictationPage(): ReactElement {
       return
     }
     const target = mediaUrl(material.id)
-    stopAtRef.current = currentItem.end
+    stopAtRef.current = playbackEnd
     const startPlayback = (from: number): void => {
       audio.playbackRate = speed
       audio.currentTime = from
@@ -273,7 +283,7 @@ export default function DictationPage(): ReactElement {
       const canResume =
         !restart &&
         audio.currentTime >= currentItem.start - 0.05 &&
-        audio.currentTime < currentItem.end - 0.05
+        audio.currentTime < playbackEnd - 0.05
       startPlayback(canResume ? audio.currentTime : currentItem.start)
     }
   }
@@ -281,10 +291,10 @@ export default function DictationPage(): ReactElement {
   const seekWithinSentence = (value: number): void => {
     const audio = audioRef.current
     if (!audio || !currentItem) return
-    const next = Math.max(currentItem.start, Math.min(value, currentItem.end))
+    const next = Math.max(currentItem.start, Math.min(value, playbackEnd))
     audio.currentTime = next
     setAudioTime(next)
-    if (stopAtRef.current === null) stopAtRef.current = currentItem.end
+    if (stopAtRef.current === null) stopAtRef.current = playbackEnd
   }
 
   const handleTimeUpdate = (): void => {
@@ -687,8 +697,8 @@ export default function DictationPage(): ReactElement {
   }
 
   const isLast = index + 1 >= session.items.length
-  const segmentLength = Math.max(currentItem.end - currentItem.start, 0.01)
-  const segmentTime = Math.min(Math.max(audioTime, currentItem.start), currentItem.end)
+  const segmentLength = Math.max(playbackEnd - currentItem.start, 0.01)
+  const segmentTime = Math.min(Math.max(audioTime, currentItem.start), playbackEnd)
   const segmentPercent = ((segmentTime - currentItem.start) / segmentLength) * 100
   return (
     <div className="page dictation-page">
@@ -752,7 +762,7 @@ export default function DictationPage(): ReactElement {
                 className="seek-bar dictation-seek-bar"
                 type="range"
                 min={currentItem.start}
-                max={currentItem.end}
+                max={playbackEnd}
                 step={0.05}
                 value={segmentTime}
                 style={{

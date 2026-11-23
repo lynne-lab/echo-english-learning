@@ -23,6 +23,25 @@ export function formatNumber(value: number): string {
   return value.toLocaleString('zh-CN')
 }
 
+/**
+ * Whisper's sentence end can land slightly before the last phoneme decays.
+ * Add a short tail when stopping playback, but never run into the next
+ * sentence (or past the end of the media).
+ */
+export function sentencePlaybackEnd(
+  sentence: { start: number; end: number },
+  nextSentence: { start: number } | null | undefined,
+  mediaDuration?: number | null,
+  tail = 0.35
+): number {
+  const limit = nextSentence
+    ? nextSentence.start - 0.05
+    : mediaDuration && Number.isFinite(mediaDuration) && mediaDuration > 0
+      ? mediaDuration - 0.02
+      : Number.POSITIVE_INFINITY
+  return Math.min(sentence.end + tail, Math.max(sentence.end, limit))
+}
+
 let englishVoice: SpeechSynthesisVoice | null | undefined
 
 export function speakWord(word: string): void {
