@@ -295,7 +295,9 @@ export default function DictationPage(): ReactElement {
       const attempt = detail.attempts.find(
         (entry) => entry.sentence_id === current.sentence_id
       )
-      setUserText(attempt?.user_text ?? '')
+      setUserText(
+        detail.draft_text ?? attempt?.user_text ?? ''
+      )
       setGrade(attempt?.grade ?? null)
       setPhase('session')
     }
@@ -310,11 +312,11 @@ export default function DictationPage(): ReactElement {
     if (phase !== 'session' || !session) return
     const timer = window.setTimeout(() => {
       void api
-        .saveDictationPosition(session.id, index)
+        .saveDictationPosition(session.id, index, userText)
         .catch(() => undefined)
-    }, 300)
+    }, 400)
     return () => window.clearTimeout(timer)
-  }, [phase, session?.id, index])
+  }, [phase, session?.id, index, userText])
 
   useEffect(() => {
     if (phase !== 'session' || !currentItem) return

@@ -172,12 +172,16 @@ export const api = {
     request<DictationSessionDetail>(`/api/dictation/sessions/${sessionId}`),
   dictationActive: () =>
     request<DictationSession | null>('/api/dictation/active'),
-  saveDictationPosition: (sessionId: string, index: number) =>
+  saveDictationPosition: (
+    sessionId: string,
+    index: number,
+    draftText?: string
+  ) =>
     request<{ ok: boolean; last_index: number }>(
       `/api/dictation/sessions/${sessionId}/position`,
       {
         method: 'PATCH',
-        body: JSON.stringify({ index })
+        body: JSON.stringify({ index, draft_text: draftText })
       }
     ),
   deleteDictationSession: (sessionId: string) =>

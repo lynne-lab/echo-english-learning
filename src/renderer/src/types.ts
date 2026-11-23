@@ -191,6 +191,7 @@ export interface DictationSessionSummary {
   completed_at: string | null
   last_index: number
   last_active_at: string | null
+  draft_text: string | null
   completed: boolean
 }
 

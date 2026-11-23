@@ -106,7 +106,8 @@ CREATE TABLE IF NOT EXISTS dictation_sessions (
     created_at TEXT NOT NULL,
     completed_at TEXT,
     last_index INTEGER NOT NULL DEFAULT 0,
-    last_active_at TEXT
+    last_active_at TEXT,
+    draft_text TEXT
 );
 
 CREATE TABLE IF NOT EXISTS dictation_attempts (
@@ -253,6 +254,7 @@ def init_db() -> None:
             "INTEGER NOT NULL DEFAULT 0",
         )
         _ensure_column(conn, "dictation_sessions", "last_active_at", "TEXT")
+        _ensure_column(conn, "dictation_sessions", "draft_text", "TEXT")
         _ensure_column(conn, "learning_progress", "position", "REAL")
         conn.execute(
             """

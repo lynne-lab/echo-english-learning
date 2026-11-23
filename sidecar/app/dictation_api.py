@@ -204,6 +204,9 @@ def _session_summary(row: Any) -> dict[str, Any]:
             if "last_active_at" in row.keys()
             else row["created_at"]
         ),
+        "draft_text": (
+            row["draft_text"] if "draft_text" in row.keys() else None
+        ),
         "completed": bool(row["completed_at"])
         or row["completed_count"] >= row["item_count"],
     }
@@ -362,6 +365,7 @@ def create_session(payload: CreateSession) -> dict[str, Any]:
 
 class PositionSave(BaseModel):
     index: int = Field(ge=0)
+    draft_text: str | None = None
 
 
 @router.get("/active")
@@ -419,10 +423,10 @@ def save_position(
         conn.execute(
             """
             UPDATE dictation_sessions
-            SET last_index = ?, last_active_at = ?
+            SET last_index = ?, last_active_at = ?, draft_text = ?
             WHERE id = ?
             """,
-            (index, now, session_id),
+            (index, now, payload.draft_text, session_id),
         )
     return {"ok": True, "last_index": index}
 
