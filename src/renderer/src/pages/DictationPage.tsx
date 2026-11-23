@@ -21,7 +21,7 @@ import {
   ScanText,
   Sparkles
 } from 'lucide-react'
-import { api, mediaUrl } from '../api'
+import { api, sentenceClipUrl } from '../api'
 import { DiffedSentence, ErrorChips } from '../components/GradeDiff'
 import { useToast } from '../components/Toast'
 import WordPanel from '../components/WordPanel'
@@ -34,13 +34,7 @@ import type {
   DictionaryEntry,
   Material
 } from '../types'
-import {
-  errorMessage,
-  formatDuration,
-  sentencePlaybackEnd,
-  speakWord,
-  stripWord
-} from '../utils'
+import { errorMessage, formatDuration, speakWord, stripWord } from '../utils'
 
 const COUNT_OPTIONS = [
   { value: 5, label: '5 句' },
@@ -172,6 +166,7 @@ export default function DictationPage(): ReactElement {
   >([])
   const [audioPlaying, setAudioPlaying] = useState(false)
   const [audioTime, setAudioTime] = useState(0)
+  const [clipDuration, setClipDuration] = useState(0)
   const [speed, setSpeed] = useState(1)
 
   const [selectedWord, setSelectedWord] = useState<{
@@ -184,14 +179,9 @@ export default function DictationPage(): ReactElement {
   const [wordAdding, setWordAdding] = useState(false)
 
   const audioRef = useRef<HTMLAudioElement | null>(null)
-  const stopAtRef = useRef<number | null>(null)
   const lookupSeqRef = useRef(0)
 
   const currentItem = session?.items[index] ?? null
-  const nextItem = session?.items[index + 1] ?? null
-  const playbackEnd = currentItem
-    ? sentencePlaybackEnd(currentItem, nextItem, material?.duration)
-    : 0
 
   useEffect(() => {
     if (!id) return
@@ -213,21 +203,22 @@ export default function DictationPage(): ReactElement {
   }, [id])
 
   useEffect(() => {
-    if (phase !== 'session' || !currentItem || !material) return
+    if (phase !== 'session' || !currentItem) return
     const audio = audioRef.current
     if (!audio) return
-    const target = mediaUrl(material.id)
-    stopAtRef.current = playbackEnd
+    const target = sentenceClipUrl(currentItem.sentence_id)
     const startPlayback = (): void => {
       audio.playbackRate = speed
-      audio.currentTime = currentItem.start
-      setAudioTime(currentItem.start)
+      audio.currentTime = 0
+      setAudioTime(0)
+      setClipDuration(Number.isFinite(audio.duration) ? audio.duration : 0)
       void audio
         .play()
         .then(() => setAudioPlaying(true))
         .catch(() => setAudioPlaying(false))
     }
     if (audio.src !== target) {
+      setClipDuration(0)
       audio.src = target
       audio.onloadedmetadata = startPlayback
       audio.load()
@@ -236,7 +227,14 @@ export default function DictationPage(): ReactElement {
     }
     // speed changes are applied by the separate effect without restarting audio
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase, currentItem?.sentence_id, material?.id])
+  }, [phase, currentItem?.sentence_id])
+
+  useEffect(() => {
+    // Warm the next sentence's clip while the current one is playing.
+    const next = session?.items[index + 1]
+    if (!next) return
+    void fetch(sentenceClipUrl(next.sentence_id)).catch(() => undefined)
+  }, [index, session])
 
   useEffect(() => {
     if (audioRef.current) audioRef.current.playbackRate = speed
@@ -257,14 +255,13 @@ export default function DictationPage(): ReactElement {
 
   const playCurrent = (restart = false): void => {
     const audio = audioRef.current
-    if (!audio || !currentItem || !material) return
+    if (!audio || !currentItem) return
     if (!restart && audioPlaying) {
       audio.pause()
       setAudioPlaying(false)
       return
     }
-    const target = mediaUrl(material.id)
-    stopAtRef.current = playbackEnd
+    const target = sentenceClipUrl(currentItem.sentence_id)
     const startPlayback = (from: number): void => {
       audio.playbackRate = speed
       audio.currentTime = from
@@ -275,39 +272,35 @@ export default function DictationPage(): ReactElement {
         .catch(() => setAudioPlaying(false))
     }
     if (audio.src !== target) {
+      setClipDuration(0)
       audio.src = target
-      audio.onloadedmetadata = () => startPlayback(currentItem.start)
+      audio.onloadedmetadata = () => {
+        setClipDuration(Number.isFinite(audio.duration) ? audio.duration : 0)
+        startPlayback(0)
+      }
       audio.load()
     } else {
-      // resume from where the user dragged to; otherwise restart the sentence
-      const canResume =
-        !restart &&
-        audio.currentTime >= currentItem.start - 0.05 &&
-        audio.currentTime < playbackEnd - 0.05
-      startPlayback(canResume ? audio.currentTime : currentItem.start)
+      setClipDuration(Number.isFinite(audio.duration) ? audio.duration : 0)
+      const atEnd =
+        Number.isFinite(audio.duration) &&
+        audio.currentTime >= audio.duration - 0.05
+      startPlayback(!restart && !atEnd ? audio.currentTime : 0)
     }
   }
 
   const seekWithinSentence = (value: number): void => {
     const audio = audioRef.current
-    if (!audio || !currentItem) return
-    const next = Math.max(currentItem.start, Math.min(value, playbackEnd))
+    if (!audio) return
+    const limit = clipDuration > 0 ? clipDuration : audio.duration || 0
+    const next = Math.max(0, Math.min(value, limit))
     audio.currentTime = next
     setAudioTime(next)
-    if (stopAtRef.current === null) stopAtRef.current = playbackEnd
   }
 
   const handleTimeUpdate = (): void => {
     const audio = audioRef.current
     if (!audio) return
     setAudioTime(audio.currentTime)
-    if (stopAtRef.current === null) return
-    if (audio.currentTime >= stopAtRef.current) {
-      audio.pause()
-      setAudioTime(stopAtRef.current)
-      stopAtRef.current = null
-      setAudioPlaying(false)
-    }
   }
 
   const closeWordPanel = (): void => {
@@ -697,9 +690,9 @@ export default function DictationPage(): ReactElement {
   }
 
   const isLast = index + 1 >= session.items.length
-  const segmentLength = Math.max(playbackEnd - currentItem.start, 0.01)
-  const segmentTime = Math.min(Math.max(audioTime, currentItem.start), playbackEnd)
-  const segmentPercent = ((segmentTime - currentItem.start) / segmentLength) * 100
+  const segmentLength = Math.max(clipDuration, 0.01)
+  const segmentTime = Math.min(Math.max(audioTime, 0), segmentLength)
+  const segmentPercent = (segmentTime / segmentLength) * 100
   return (
     <div className="page dictation-page">
       <header className="dictation-header">
@@ -756,13 +749,13 @@ export default function DictationPage(): ReactElement {
             </div>
             <div className="dictation-seek">
               <span className="dictation-seek-time">
-                {formatDuration(segmentTime - currentItem.start)}
+                {formatDuration(segmentTime)}
               </span>
               <input
                 className="seek-bar dictation-seek-bar"
                 type="range"
-                min={currentItem.start}
-                max={playbackEnd}
+                min={0}
+                max={segmentLength}
                 step={0.05}
                 value={segmentTime}
                 style={{
@@ -871,7 +864,6 @@ export default function DictationPage(): ReactElement {
         onTimeUpdate={handleTimeUpdate}
         onEnded={() => {
           setAudioPlaying(false)
-          stopAtRef.current = null
         }}
       />
     </div>
