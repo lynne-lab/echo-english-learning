@@ -159,7 +159,6 @@ export default function DictationPage(): ReactElement {
   const [count, setCount] = useState(10)
   const [starting, setStarting] = useState(false)
   const [progress, setProgress] = useState<DictationProgress | null>(null)
-  const [resumedFor, setResumedFor] = useState<string | null>(null)
   const [resumeSettled, setResumeSettled] = useState(
     () => searchParams.get('new') === '1'
   )
@@ -224,7 +223,6 @@ export default function DictationPage(): ReactElement {
     setIndex(0)
     setUserText('')
     setGrade(null)
-    setResumedFor(null)
     setResumeSettled(searchParams.get('new') === '1')
     manualStartRef.current = false
     api
@@ -246,7 +244,7 @@ export default function DictationPage(): ReactElement {
   useEffect(() => {
     if (phase !== 'setup' || !material || !id) return
     if (material.id !== id) return
-    if (searchParams.get('new') === '1' || resumedFor === material.id) {
+    if (searchParams.get('new') === '1') {
       setResumeSettled(true)
       return
     }
@@ -254,7 +252,6 @@ export default function DictationPage(): ReactElement {
     const requestedSession = searchParams.get('session')
 
     const resume = async (): Promise<void> => {
-      setResumedFor(material.id)
       try {
         let targetId = requestedSession
         if (!targetId) {
@@ -308,8 +305,14 @@ export default function DictationPage(): ReactElement {
         const attempt = detail.attempts.find(
           (entry) => entry.sentence_id === current.sentence_id
         )
+        // The draft belongs to the sentence stored in last_index; only use it
+        // when we actually resume there, otherwise it would leak into another
+        // sentence's answer box.
+        const draftMatchesIndex =
+          detail.draft_text != null &&
+          resumeIndex === (detail.last_index ?? 0)
         setUserText(
-          detail.draft_text ?? attempt?.user_text ?? ''
+          draftMatchesIndex ? detail.draft_text ?? '' : attempt?.user_text ?? ''
         )
         setGrade(attempt?.grade ?? null)
         setPhase('session')
@@ -322,7 +325,7 @@ export default function DictationPage(): ReactElement {
     return () => {
       cancelled = true
     }
-  }, [phase, material?.id, id, searchParams, resumedFor])
+  }, [phase, material?.id, id, searchParams])
 
   useEffect(() => {
     if (phase !== 'session' || !session) {
@@ -595,7 +598,6 @@ export default function DictationPage(): ReactElement {
     setIndex(0)
     setUserText('')
     setGrade(null)
-    setResumedFor(material?.id ?? null)
   }
 
   const errorTotals = useMemo<DictationErrors>(() => {
