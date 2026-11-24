@@ -160,6 +160,9 @@ export default function DictationPage(): ReactElement {
   const [starting, setStarting] = useState(false)
   const [progress, setProgress] = useState<DictationProgress | null>(null)
   const [resumedFor, setResumedFor] = useState<string | null>(null)
+  const [resumeSettled, setResumeSettled] = useState(
+    () => searchParams.get('new') === '1'
+  )
   const [session, setSession] = useState<DictationSession | null>(null)
   const [index, setIndex] = useState(0)
   const [userText, setUserText] = useState('')
@@ -185,6 +188,11 @@ export default function DictationPage(): ReactElement {
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const lookupSeqRef = useRef(0)
   const manualStartRef = useRef(false)
+  const positionRef = useRef<{
+    sessionId: string
+    index: number
+    draft: string
+  } | null>(null)
 
   const currentItem = session?.items[index] ?? null
 
@@ -217,6 +225,7 @@ export default function DictationPage(): ReactElement {
     setUserText('')
     setGrade(null)
     setResumedFor(null)
+    setResumeSettled(searchParams.get('new') === '1')
     manualStartRef.current = false
     api
       .material(id)
@@ -236,70 +245,77 @@ export default function DictationPage(): ReactElement {
 
   useEffect(() => {
     if (phase !== 'setup' || !material || !id) return
-    if (searchParams.get('new') === '1') return
-    if (resumedFor === material.id) return
+    if (material.id !== id) return
+    if (searchParams.get('new') === '1' || resumedFor === material.id) {
+      setResumeSettled(true)
+      return
+    }
     let cancelled = false
     const requestedSession = searchParams.get('session')
 
     const resume = async (): Promise<void> => {
       setResumedFor(material.id)
-      let targetId = requestedSession
-      if (!targetId) {
-        const active = await api.dictationActive().catch(() => null)
-        targetId = active?.id ?? null
-      }
-      if (!targetId || cancelled || manualStartRef.current) return
-      const detail = await api.dictationSession(targetId).catch(() => null)
-      if (
-        !detail ||
-        cancelled ||
-        manualStartRef.current ||
-        detail.material_id !== material.id ||
-        detail.completed
-      ) {
-        return
-      }
-      let resumeIndex = Math.max(
-        0,
-        Math.min(detail.items.length - 1, detail.last_index ?? 0)
-      )
-      if (resumeIndex === 0 && detail.attempts.length > 0) {
-        const attempted = new Set(
-          detail.attempts.map((attempt) => attempt.sentence_id)
+      try {
+        let targetId = requestedSession
+        if (!targetId) {
+          const active = await api.dictationActive().catch(() => null)
+          targetId = active?.id ?? null
+        }
+        if (!targetId || cancelled || manualStartRef.current) return
+        const detail = await api.dictationSession(targetId).catch(() => null)
+        if (
+          !detail ||
+          cancelled ||
+          manualStartRef.current ||
+          detail.material_id !== material.id ||
+          detail.completed
+        ) {
+          return
+        }
+        let resumeIndex = Math.max(
+          0,
+          Math.min(detail.items.length - 1, detail.last_index ?? 0)
         )
-        const firstOpen = detail.items.findIndex(
-          (item) => !attempted.has(item.sentence_id)
-        )
-        if (firstOpen >= 0) resumeIndex = firstOpen
-      }
-      const itemMap = new Map(
-        detail.items.map((item) => [item.sentence_id, item])
-      )
-      setSession(detail)
-      setMode(detail.mode)
-      setIndex(resumeIndex)
-      setAttempts(
-        detail.attempts
-          .map((attempt) => {
-            const item = itemMap.get(attempt.sentence_id)
-            return item ? { item, grade: attempt.grade } : null
-          })
-          .filter(
-            (
-              entry
-            ): entry is { item: DictationItem; grade: DictationGrade } =>
-              entry !== null
+        if (resumeIndex === 0 && detail.attempts.length > 0) {
+          const attempted = new Set(
+            detail.attempts.map((attempt) => attempt.sentence_id)
           )
-      )
-      const current = detail.items[resumeIndex]
-      const attempt = detail.attempts.find(
-        (entry) => entry.sentence_id === current.sentence_id
-      )
-      setUserText(
-        detail.draft_text ?? attempt?.user_text ?? ''
-      )
-      setGrade(attempt?.grade ?? null)
-      setPhase('session')
+          const firstOpen = detail.items.findIndex(
+            (item) => !attempted.has(item.sentence_id)
+          )
+          if (firstOpen >= 0) resumeIndex = firstOpen
+        }
+        const itemMap = new Map(
+          detail.items.map((item) => [item.sentence_id, item])
+        )
+        setSession(detail)
+        setMode(detail.mode)
+        setIndex(resumeIndex)
+        setAttempts(
+          detail.attempts
+            .map((attempt) => {
+              const item = itemMap.get(attempt.sentence_id)
+              return item ? { item, grade: attempt.grade } : null
+            })
+            .filter(
+              (
+                entry
+              ): entry is { item: DictationItem; grade: DictationGrade } =>
+                entry !== null
+            )
+        )
+        const current = detail.items[resumeIndex]
+        const attempt = detail.attempts.find(
+          (entry) => entry.sentence_id === current.sentence_id
+        )
+        setUserText(
+          detail.draft_text ?? attempt?.user_text ?? ''
+        )
+        setGrade(attempt?.grade ?? null)
+        setPhase('session')
+      } finally {
+        if (!cancelled) setResumeSettled(true)
+      }
     }
 
     void resume()
@@ -309,7 +325,11 @@ export default function DictationPage(): ReactElement {
   }, [phase, material?.id, id, searchParams, resumedFor])
 
   useEffect(() => {
-    if (phase !== 'session' || !session) return
+    if (phase !== 'session' || !session) {
+      positionRef.current = null
+      return
+    }
+    positionRef.current = { sessionId: session.id, index, draft: userText }
     const timer = window.setTimeout(() => {
       void api
         .saveDictationPosition(session.id, index, userText)
@@ -319,7 +339,22 @@ export default function DictationPage(): ReactElement {
   }, [phase, session?.id, index, userText])
 
   useEffect(() => {
+    // Leaving the page (tab switch, closing, or navigating away) flushes the
+    // pending position immediately instead of waiting for the debounce.
+    return () => {
+      const snapshot = positionRef.current
+      if (!snapshot) return
+      void api
+        .saveDictationPosition(snapshot.sessionId, snapshot.index, snapshot.draft)
+        .catch(() => undefined)
+    }
+  }, [])
+
+  useEffect(() => {
     if (phase !== 'session' || !currentItem) return
+    // Resuming into a sentence that was already graded shows the result
+    // panel; don't start the clip until the learner asks for it.
+    if (grade) return
     const audio = audioRef.current
     if (!audio) return
     const target = sentenceClipUrl(currentItem.sentence_id)
@@ -343,7 +378,7 @@ export default function DictationPage(): ReactElement {
     }
     // speed changes are applied by the separate effect without restarting audio
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase, currentItem?.sentence_id])
+  }, [phase, currentItem?.sentence_id, grade])
 
   useEffect(() => {
     // Warm the next sentence's clip while the current one is playing.
@@ -622,6 +657,16 @@ export default function DictationPage(): ReactElement {
           <Link className="btn" to={`/player/${material.id}`}>
             去精听页查看
           </Link>
+        </div>
+      </div>
+    )
+  }
+
+  if (phase === 'setup' && !resumeSettled) {
+    return (
+      <div className="page dictation-page">
+        <div className="page-loading">
+          <Loader2 className="spin" size={20} /> 正在恢复上次默写…
         </div>
       </div>
     )

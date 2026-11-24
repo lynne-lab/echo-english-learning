@@ -667,6 +667,13 @@
   min-width: 0;
 }
 
+.dictation-material-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
 .dictation-material-info h3 {
   margin: 0 0 3px;
   font-size: 13.5px;

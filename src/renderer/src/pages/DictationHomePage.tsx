@@ -159,27 +159,51 @@ export default function DictationHomePage(): ReactElement {
             </header>
 
             <div className="dictation-material-list">
-              {readyMaterials.map((material) => (
-                <div className="dictation-material-row" key={material.id}>
-                  <div className={`material-icon ${material.media_type}`}>
-                    {material.media_type === 'video' ? <Film size={20} /> : <Music2 size={20} />}
+              {readyMaterials.map((material) => {
+                const resume =
+                  active && active.material_id === material.id ? active : null
+                return (
+                  <div className="dictation-material-row" key={material.id}>
+                    <div className={`material-icon ${material.media_type}`}>
+                      {material.media_type === 'video' ? <Film size={20} /> : <Music2 size={20} />}
+                    </div>
+                    <div className="dictation-material-info">
+                      <h3>{material.title}</h3>
+                      <p>
+                        {material.sentence_count} 句 · {formatDuration(material.duration)}
+                        {resume
+                          ? ` · 未完成 ${resume.completed_count}/${resume.item_count} 句`
+                          : ''}
+                      </p>
+                    </div>
+                    {resume ? (
+                      <div className="dictation-material-actions">
+                        <button
+                          className="btn btn-small btn-primary"
+                          onClick={() =>
+                            navigate(`/dictation/${material.id}?session=${resume.id}`)
+                          }
+                        >
+                          继续默写 <ChevronRight size={14} />
+                        </button>
+                        <button
+                          className="btn btn-small"
+                          onClick={() => navigate(`/dictation/${material.id}?new=1`)}
+                        >
+                          重新选择
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        className="btn btn-small btn-primary"
+                        onClick={() => navigate(`/dictation/${material.id}?new=1`)}
+                      >
+                        开始默写 <ChevronRight size={14} />
+                      </button>
+                    )}
                   </div>
-                  <div className="dictation-material-info">
-                    <h3>{material.title}</h3>
-                    <p>
-                      {material.sentence_count} 句 · {formatDuration(material.duration)}
-                    </p>
-                  </div>
-                  <button
-                    className="btn btn-small btn-primary"
-                    onClick={() =>
-                      navigate(`/dictation/${material.id}?new=1`)
-                    }
-                  >
-                    开始默写 <ChevronRight size={14} />
-                  </button>
-                </div>
-              ))}
+                )
+              })}
             </div>
           </section>
 
