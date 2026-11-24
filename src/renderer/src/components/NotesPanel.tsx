@@ -1,4 +1,10 @@
-import { useEffect, useRef, useState, type ReactElement } from 'react'
+import {
+  useEffect,
+  useRef,
+  useState,
+  type PointerEvent as ReactPointerEvent,
+  type ReactElement
+} from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import Markdown, { type Components } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
@@ -32,6 +38,26 @@ const markdownComponents: Components = {
 type SaveState = 'idle' | 'saving' | 'saved' | 'error'
 type ExportKind = 'md' | 'pdf' | null
 
+const NOTES_WIDTH_KEY = 'echo.notes.width'
+const DEFAULT_WIDTH = 372
+const MIN_WIDTH = 280
+const MAX_WIDTH = 680
+
+function clampWidth(width: number): number {
+  const room = Math.max(MIN_WIDTH, window.innerWidth - 620)
+  return Math.min(Math.max(width, MIN_WIDTH), Math.min(MAX_WIDTH, room))
+}
+
+function initialWidth(): number {
+  try {
+    const stored = Number(window.localStorage.getItem(NOTES_WIDTH_KEY))
+    if (Number.isFinite(stored) && stored > 0) return clampWidth(stored)
+  } catch {
+    /* storage unavailable */
+  }
+  return clampWidth(DEFAULT_WIDTH)
+}
+
 export default function NotesPanel({
   onClose
 }: {
@@ -44,10 +70,12 @@ export default function NotesPanel({
   const [saveState, setSaveState] = useState<SaveState>('idle')
   const [savedAt, setSavedAt] = useState<string | null>(null)
   const [exporting, setExporting] = useState<ExportKind>(null)
+  const [width, setWidth] = useState(initialWidth)
 
   const latestRef = useRef('')
   const loadedRef = useRef(false)
   const dirtyRef = useRef(false)
+  const dragRef = useRef<{ startX: number; startWidth: number } | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -109,6 +137,52 @@ export default function NotesPanel({
     }
   }, [])
 
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      try {
+        window.localStorage.setItem(NOTES_WIDTH_KEY, String(width))
+      } catch {
+        /* storage unavailable */
+      }
+    }, 250)
+    return () => window.clearTimeout(timer)
+  }, [width])
+
+  useEffect(() => {
+    const onResize = (): void => {
+      setWidth((current) => clampWidth(current))
+    }
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
+
+  const startDrag = (event: ReactPointerEvent<HTMLDivElement>): void => {
+    if (event.button !== 0) return
+    event.preventDefault()
+    dragRef.current = { startX: event.clientX, startWidth: width }
+    event.currentTarget.setPointerCapture(event.pointerId)
+    document.body.classList.add('notes-resizing')
+  }
+
+  const moveDrag = (event: ReactPointerEvent<HTMLDivElement>): void => {
+    const drag = dragRef.current
+    if (!drag) return
+    setWidth(clampWidth(drag.startWidth + (drag.startX - event.clientX)))
+  }
+
+  const endDrag = (event: ReactPointerEvent<HTMLDivElement>): void => {
+    if (!dragRef.current) return
+    dragRef.current = null
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId)
+    }
+    document.body.classList.remove('notes-resizing')
+  }
+
+  const resetWidth = (): void => {
+    setWidth(clampWidth(DEFAULT_WIDTH))
+  }
+
   const exportMarkdown = async (): Promise<void> => {
     if (exporting || !window.api) return
     setExporting('md')
@@ -150,7 +224,22 @@ export default function NotesPanel({
           : '自动保存'
 
   return (
-    <section className="notes-panel" aria-label="学习笔记">
+    <section className="notes-panel" aria-label="学习笔记" style={{ width }}>
+      <div
+        className="notes-resizer"
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="调整笔记栏宽度"
+        aria-valuenow={Math.round(width)}
+        aria-valuemin={MIN_WIDTH}
+        aria-valuemax={MAX_WIDTH}
+        title="拖动调整宽度，双击恢复默认"
+        onPointerDown={startDrag}
+        onPointerMove={moveDrag}
+        onPointerUp={endDrag}
+        onPointerCancel={endDrag}
+        onDoubleClick={resetWidth}
+      />
       <header className="notes-head">
         <div className="notes-head-title">
           <div className="notes-icon">

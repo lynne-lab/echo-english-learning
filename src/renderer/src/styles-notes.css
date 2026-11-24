@@ -1,6 +1,7 @@
 /* ------------------------------------------------------------------ notes panel */
 
 .notes-panel {
+  position: relative;
   width: 372px;
   flex-shrink: 0;
   display: flex;
@@ -8,6 +9,41 @@
   height: 100vh;
   border-left: 1px solid var(--border);
   background: linear-gradient(180deg, rgba(16, 23, 35, 0.98), rgba(10, 13, 19, 0.99));
+}
+
+.notes-resizer {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -4px;
+  width: 9px;
+  z-index: 5;
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.notes-resizer::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 4px;
+  width: 1px;
+  background: transparent;
+  transition: background 0.15s ease, box-shadow 0.15s ease;
+}
+
+.notes-resizer:hover::after,
+.notes-resizer:active::after {
+  background: var(--accent);
+  opacity: 0.75;
+  box-shadow: 0 0 8px rgba(94, 234, 212, 0.5);
+}
+
+body.notes-resizing,
+body.notes-resizing * {
+  cursor: col-resize !important;
+  user-select: none !important;
 }
 
 .notes-head {
@@ -354,10 +390,4 @@ button.nav-item {
   text-align: left;
   background: transparent;
   cursor: pointer;
-}
-
-@media (max-width: 1180px) {
-  .notes-panel {
-    width: 330px;
-  }
 }
