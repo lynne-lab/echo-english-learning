@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactElement } from 'react'
 import { HashRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { AudioLines, RefreshCw } from 'lucide-react'
 import { api } from './api'
+import NotesPanel from './components/NotesPanel'
 import Sidebar from './components/Sidebar'
 import { ToastProvider } from './components/Toast'
 import DictationHomePage from './pages/DictationHomePage'
@@ -52,9 +53,13 @@ function Splash({ state }: { state: EngineState }): ReactElement {
 }
 
 function Shell(): ReactElement {
+  const [notesOpen, setNotesOpen] = useState(true)
   return (
     <div className="app-shell">
-      <Sidebar />
+      <Sidebar
+        notesOpen={notesOpen}
+        onToggleNotes={() => setNotesOpen((value) => !value)}
+      />
       <main className="app-main">
         <Routes>
           <Route path="/" element={<Navigate to="/library" replace />} />
@@ -79,6 +84,7 @@ function Shell(): ReactElement {
           <Route path="*" element={<Navigate to="/library" replace />} />
         </Routes>
       </main>
+      {notesOpen ? <NotesPanel onClose={() => setNotesOpen(false)} /> : null}
     </div>
   )
 }

@@ -6,6 +6,7 @@ import './styles-phase2.css'
 import './styles-stats.css'
 import './styles-shadow.css'
 import './styles-plan.css'
+import './styles-notes.css'
 
 ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
   <React.StrictMode>

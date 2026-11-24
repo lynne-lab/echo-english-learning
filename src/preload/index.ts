@@ -8,7 +8,13 @@ const api: EchoApi = {
   getAppInfo: () => ipcRenderer.invoke('app:info'),
   openDataDir: () => ipcRenderer.invoke('shell:openDataDir'),
   openSidecarLog: () => ipcRenderer.invoke('shell:openSidecarLog'),
-  getSidecarUrl: () => ipcRenderer.invoke('sidecar:url')
+  getSidecarUrl: () => ipcRenderer.invoke('sidecar:url'),
+  loadNotes: () => ipcRenderer.invoke('notes:load'),
+  saveNotes: (text: string) => ipcRenderer.invoke('notes:save', text),
+  exportNotesMarkdown: (text: string) =>
+    ipcRenderer.invoke('notes:exportMarkdown', text),
+  exportNotesPdf: (payload: { text: string; html: string }) =>
+    ipcRenderer.invoke('notes:exportPdf', payload)
 }
 
 contextBridge.exposeInMainWorld('api', api)

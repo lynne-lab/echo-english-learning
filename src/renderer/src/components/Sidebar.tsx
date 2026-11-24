@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactElement } from 'react'
+import { Fragment, useEffect, useState, type ReactElement } from 'react'
 import {
   NavLink,
   useLocation,
@@ -15,7 +15,8 @@ import {
   PenLine,
   Repeat2,
   Settings2,
-  ShieldCheck
+  ShieldCheck,
+  StickyNote
 } from 'lucide-react'
 import { api } from '../api'
 
@@ -31,7 +32,13 @@ const items = [
   { to: '/settings', label: '设置', icon: Settings2 }
 ]
 
-export default function Sidebar(): ReactElement {
+export default function Sidebar({
+  notesOpen,
+  onToggleNotes
+}: {
+  notesOpen: boolean
+  onToggleNotes: () => void
+}): ReactElement {
   const { pathname } = useLocation()
   const navigate = useNavigate()
   const [dueCount, setDueCount] = useState(0)
@@ -99,32 +106,43 @@ export default function Sidebar(): ReactElement {
 
       <nav className="nav">
         {items.map(({ to, label, icon: Icon, badge, match }) => (
-          <NavLink
-            key={to}
-            to={to}
-            onClick={(event) => {
-              if (to !== '/dictation' || !dictationPath) return
-              if (pathname.startsWith('/dictation')) {
-                event.preventDefault()
-                return
-              }
-              event.preventDefault()
-              navigate(dictationPath)
-            }}
-            className={({ isActive }) =>
-              `nav-item${
-                isActive || match?.some((prefix) => pathname.startsWith(prefix))
-                  ? ' active'
-                  : ''
-              }`
-            }
-          >
-            <Icon size={18} strokeWidth={1.9} />
-            <span>{label}</span>
-            {badge && dueCount > 0 ? (
-              <span className="nav-badge">{dueCount > 99 ? '99+' : dueCount}</span>
+          <Fragment key={to}>
+            {to === '/settings' ? (
+              <button
+                className={`nav-item${notesOpen ? ' active' : ''}`}
+                onClick={onToggleNotes}
+                title={notesOpen ? '关闭学习笔记' : '打开学习笔记'}
+              >
+                <StickyNote size={18} strokeWidth={1.9} />
+                <span>笔记</span>
+              </button>
             ) : null}
-          </NavLink>
+            <NavLink
+              to={to}
+              onClick={(event) => {
+                if (to !== '/dictation' || !dictationPath) return
+                if (pathname.startsWith('/dictation')) {
+                  event.preventDefault()
+                  return
+                }
+                event.preventDefault()
+                navigate(dictationPath)
+              }}
+              className={({ isActive }) =>
+                `nav-item${
+                  isActive || match?.some((prefix) => pathname.startsWith(prefix))
+                    ? ' active'
+                    : ''
+                }`
+              }
+            >
+              <Icon size={18} strokeWidth={1.9} />
+              <span>{label}</span>
+              {badge && dueCount > 0 ? (
+                <span className="nav-badge">{dueCount > 99 ? '99+' : dueCount}</span>
+              ) : null}
+            </NavLink>
+          </Fragment>
         ))}
       </nav>
 
@@ -133,7 +151,7 @@ export default function Sidebar(): ReactElement {
           <ShieldCheck size={15} />
           <span>本地运行 · 离线优先</span>
         </div>
-        <div className="version">v0.8.3 · 断点续学</div>
+        <div className="version">v0.9.0 · 学习笔记</div>
       </div>
     </aside>
   )

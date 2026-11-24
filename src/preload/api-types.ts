@@ -13,6 +13,10 @@ export interface EchoApi {
   openDataDir(): Promise<void>
   openSidecarLog(): Promise<void>
   getSidecarUrl(): Promise<string>
+  loadNotes(): Promise<string>
+  saveNotes(text: string): Promise<{ ok: boolean }>
+  exportNotesMarkdown(text: string): Promise<string | null>
+  exportNotesPdf(payload: { text: string; html: string }): Promise<string | null>
 }
 
 declare global {

@@ -1,5 +1,7 @@
 import { app, BrowserWindow, dialog, ipcMain, session, shell } from 'electron'
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { noteTitle, writeNotePdf } from './notes'
 import {
   getAppInfo,
   getDataDir,
@@ -9,6 +11,12 @@ import {
 } from './sidecar'
 
 let mainWindow: BrowserWindow | null = null
+
+const NOTES_FILENAME = 'notes.md'
+
+function notesFilePath(): string {
+  return join(getDataDir(), NOTES_FILENAME)
+}
 
 function createWindow(): void {
   mainWindow = new BrowserWindow({
@@ -98,6 +106,49 @@ function registerIpc(): void {
     return shell.openPath(join(getDataDir(), 'logs'))
   })
   ipcMain.handle('sidecar:url', () => getSidecarUrl())
+
+  ipcMain.handle('notes:load', () => {
+    try {
+      return readFileSync(notesFilePath(), 'utf8')
+    } catch {
+      return ''
+    }
+  })
+
+  ipcMain.handle('notes:save', (_event, text: unknown) => {
+    if (typeof text !== 'string') throw new Error('笔记内容无效')
+    mkdirSync(getDataDir(), { recursive: true })
+    writeFileSync(notesFilePath(), text, 'utf8')
+    return { ok: true }
+  })
+
+  ipcMain.handle('notes:exportMarkdown', async (_event, text: unknown) => {
+    if (typeof text !== 'string') throw new Error('笔记内容无效')
+    const result = await dialog.showSaveDialog({
+      title: '导出笔记为 Markdown',
+      defaultPath: `${noteTitle(text)}.md`,
+      filters: [{ name: 'Markdown', extensions: ['md'] }]
+    })
+    if (result.canceled || !result.filePath) return null
+    writeFileSync(result.filePath, text, 'utf8')
+    return result.filePath
+  })
+
+  ipcMain.handle('notes:exportPdf', async (_event, payload: unknown) => {
+    const data = payload as { text?: unknown; html?: unknown } | null
+    if (!data || typeof data.text !== 'string' || typeof data.html !== 'string') {
+      throw new Error('笔记内容无效')
+    }
+    const title = noteTitle(data.text)
+    const result = await dialog.showSaveDialog({
+      title: '导出笔记为 PDF',
+      defaultPath: `${title}.pdf`,
+      filters: [{ name: 'PDF', extensions: ['pdf'] }]
+    })
+    if (result.canceled || !result.filePath) return null
+    await writeNotePdf(result.filePath, title, data.html)
+    return result.filePath
+  })
 }
 
 app.whenReady().then(async () => {

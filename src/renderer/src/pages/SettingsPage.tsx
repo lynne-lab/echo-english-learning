@@ -617,7 +617,7 @@ export default function SettingsPage(): ReactElement {
           </div>
           <div className="settings-row">
             <span className="settings-label">版本</span>
-            <span className="settings-value">v{appInfo?.version ?? '0.8.3'} · 断点续学</span>
+            <span className="settings-value">v{appInfo?.version ?? '0.9.0'} · 学习笔记</span>
           </div>
           <div className="settings-row">
             <span className="settings-label">技术栈</span>
