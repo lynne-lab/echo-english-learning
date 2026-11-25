@@ -106,57 +106,99 @@ def _word_count(text: str) -> int:
     return len(re.findall(r"[A-Za-z0-9']+", text))
 
 
-def split_segment(segment: Any) -> list[dict[str, Any]]:
-    words = list(getattr(segment, "words", None) or [])
-    if not words:
-        text = re.sub(r"\s+", " ", (segment.text or "")).strip()
-        if not text:
-            return []
-        return [
-            {
-                "start": round(float(segment.start), 3),
-                "end": round(float(segment.end), 3),
-                "text": text,
-                "words": None,
-            }
-        ]
+# A sentence may span several Whisper segments: the model splits long speech at
+# VAD pauses, not at sentence boundaries. Only these rules end a sentence.
+PAUSE_SENTENCE_GAP = 0.9
+MIN_SENTENCE_WORDS = 6
+MAX_SENTENCE_WORDS = 45
+MAX_SENTENCE_SECONDS = 25.0
 
-    chunks: list[list[Any]] = []
-    current: list[Any] = []
-    for index, word in enumerate(words):
-        current.append(word)
-        following = words[index + 1] if index + 1 < len(words) else None
-        text_so_far = "".join(w.word for w in current).strip()
-        long_pause = (
-            following is not None
-            and (float(following.start) - float(word.end)) > 0.9
-            and _word_count(text_so_far) >= 6
-        )
-        if _ends_sentence(word.word) or long_pause or following is None:
-            chunks.append(current)
-            current = []
 
-    results: list[dict[str, Any]] = []
-    for chunk in chunks:
-        text = "".join(w.word for w in chunk)
-        text = re.sub(r"\s+", " ", text).strip()
-        if not text:
+def _join_words(words: list[dict[str, Any]]) -> str:
+    """Join word tokens without relying on Whisper's leading spaces."""
+    parts: list[str] = []
+    for word in words:
+        token = word["w"]
+        stripped = token.strip()
+        if not parts:
+            parts.append(stripped)
             continue
-        results.append(
+        if token[:1].isspace():
+            parts.append(token)
+        elif stripped and re.match(r"^[.,!?;:…)\]}\"'’\-]", stripped):
+            parts.append(stripped)
+        else:
+            parts.append(f" {stripped}")
+    return re.sub(r"\s+", " ", "".join(parts)).strip()
+
+
+def _sentence_from_words(words: list[dict[str, Any]]) -> dict[str, Any] | None:
+    text = _join_words(words)
+    if not text:
+        return None
+    return {
+        "start": round(words[0]["s"], 3),
+        "end": round(words[-1]["e"], 3),
+        "text": text,
+        "words": [
             {
-                "start": round(float(chunk[0].start), 3),
-                "end": round(float(chunk[-1].end), 3),
-                "text": text,
-                "words": [
-                    {
-                        "w": str(w.word).strip(),
-                        "s": round(float(w.start), 3),
-                        "e": round(float(w.end), 3),
-                    }
-                    for w in chunk
-                ],
+                "w": word["w"].strip(),
+                "s": round(word["s"], 3),
+                "e": round(word["e"], 3),
             }
+            for word in words
+        ],
+    }
+
+
+def split_units(units: list[tuple[str, Any]]) -> list[dict[str, Any]]:
+    """Group a stream of word/segment units into sentences.
+
+    Words are joined across Whisper segments. A sentence ends on end
+    punctuation, a long pause (when enough words have accumulated), or as a
+    safety limit for unpunctuated speech. Segments without word timestamps
+    stand alone.
+    """
+    results: list[dict[str, Any]] = []
+    current: list[dict[str, Any]] = []
+
+    def flush() -> None:
+        sentence = _sentence_from_words(current)
+        if sentence:
+            results.append(sentence)
+        current.clear()
+
+    for kind, payload in units:
+        if kind == "segment":
+            if current:
+                flush()
+            text = re.sub(r"\s+", " ", str(payload["text"])).strip()
+            if text:
+                results.append(
+                    {
+                        "start": round(float(payload["start"]), 3),
+                        "end": round(float(payload["end"]), 3),
+                        "text": text,
+                        "words": None,
+                    }
+                )
+            continue
+
+        word = payload
+        if current:
+            gap = word["s"] - current[-1]["e"]
+            if gap > PAUSE_SENTENCE_GAP and len(current) >= MIN_SENTENCE_WORDS:
+                flush()
+        current.append(word)
+        long_enough = (
+            len(current) >= MAX_SENTENCE_WORDS
+            or (current[-1]["e"] - current[0]["s"]) >= MAX_SENTENCE_SECONDS
         )
+        if _ends_sentence(word["w"]) or long_enough:
+            flush()
+
+    if current:
+        flush()
     return results
 
 
@@ -238,10 +280,31 @@ def _collect_sentences(
         duration = info_duration
         db.update_material(material_id, duration=duration)
 
-    sentences: list[dict[str, Any]] = []
+    units: list[tuple[str, Any]] = []
     last_update = 0.0
     for segment in segments_iter:
-        sentences.extend(split_segment(segment))
+        words = list(getattr(segment, "words", None) or [])
+        if words:
+            for word in words:
+                try:
+                    start = float(word.start)
+                    end = float(word.end)
+                except (TypeError, ValueError):
+                    continue
+                units.append(("word", {"w": str(word.word), "s": start, "e": end}))
+        else:
+            text = re.sub(r"\s+", " ", (segment.text or "")).strip()
+            if text:
+                units.append(
+                    (
+                        "segment",
+                        {
+                            "start": float(segment.start),
+                            "end": float(segment.end),
+                            "text": text,
+                        },
+                    )
+                )
         now = time.time()
         if now - last_update > 0.8:
             last_update = now
@@ -251,7 +314,7 @@ def _collect_sentences(
                 stage=f"正在识别语音 {int(pct * 100)}%",
                 progress=0.35 + 0.55 * pct,
             )
-    return sentences, duration
+    return split_units(units), duration
 
 
 def _is_cuda_error(exc: Exception) -> bool:
