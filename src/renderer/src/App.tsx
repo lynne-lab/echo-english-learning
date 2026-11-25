@@ -14,6 +14,7 @@ import PracticeHomePage from './pages/PracticeHomePage'
 import ReviewPage from './pages/ReviewPage'
 import SettingsPage from './pages/SettingsPage'
 import ShadowingPage from './pages/ShadowingPage'
+import ShadowingReviewPage from './pages/ShadowingReviewPage'
 import StatsPage from './pages/StatsPage'
 import WordsPage from './pages/WordsPage'
 
@@ -77,6 +78,7 @@ function Shell(): ReactElement {
           <Route path="/review" element={<ReviewPage />} />
           <Route path="/dictation" element={<DictationHomePage />} />
           <Route path="/dictation/:id" element={<DictationPage />} />
+          <Route path="/shadow/:id/review" element={<ShadowingReviewPage />} />
           <Route path="/shadow/:id" element={<ShadowingPage />} />
           <Route path="/words" element={<WordsPage />} />
           <Route path="/stats" element={<StatsPage />} />

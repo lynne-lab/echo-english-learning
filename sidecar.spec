@@ -68,6 +68,9 @@ hiddenimports += [
     "sidecar.app.cuda",
     "sidecar.app.azure_speech",
     "sidecar.app.tencent_speech",
+    "sidecar.app.shadow_review",
+    "sidecar.app.shadow_review_api",
+    "sidecar.app.llm",
     "websockets.asyncio.client",
     "websockets.legacy.client",
 ]

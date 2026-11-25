@@ -13,7 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, Response, StreamingResponse
 from pydantic import BaseModel, Field
 
-from . import config, db, dictionary, jobs, srs
+from . import config, db, dictionary, jobs, shadow_review, srs
 from .dictation_api import router as dictation_router
 from .media import ALLOWED_EXTENSIONS, ffmpeg_available, probe_media
 from .module_state_api import router as module_state_router
@@ -21,6 +21,7 @@ from .plan_api import router as plan_router
 from .progress_api import router as progress_router
 from .recordings_api import router as recordings_router
 from .reviews_api import router as reviews_router
+from .shadow_review_api import router as shadow_review_router
 from .stats_api import router as stats_router
 from .transcribe import runtime
 
@@ -35,7 +36,7 @@ MODEL_IDS = {model["id"] for model in WHISPER_MODELS}
 # Bump when the clip extraction logic changes so stale WAVs are ignored.
 CLIP_VERSION = 2
 
-app = FastAPI(title="Echo Sidecar", version="0.8.1")
+app = FastAPI(title="Echo Sidecar", version="0.10.0")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -50,6 +51,7 @@ app.include_router(recordings_router)
 app.include_router(plan_router)
 app.include_router(progress_router)
 app.include_router(module_state_router)
+app.include_router(shadow_review_router)
 
 
 # ---------------------------------------------------------------- 基础信息
@@ -59,7 +61,7 @@ app.include_router(module_state_router)
 def health() -> dict[str, Any]:
     return {
         "ok": True,
-        "version": "0.8.1",
+        "version": "0.10.0",
         "whisper_model": db.get_setting("whisper_model", "small.en"),
         "device": runtime.get("device") or "auto",
         "model_loaded": runtime.get("model"),
@@ -209,6 +211,9 @@ def delete_material(material_id: str) -> dict[str, bool]:
 
     with db.get_conn() as conn:
         conn.execute("DELETE FROM recordings WHERE material_id = ?", (material_id,))
+        conn.execute(
+            "DELETE FROM shadow_reviews WHERE material_id = ?", (material_id,)
+        )
         conn.execute("DELETE FROM materials WHERE id = ?", (material_id,))
 
     if material.get("source_type") == "url" and config.settings is not None:
@@ -652,12 +657,25 @@ def _speech_settings() -> dict[str, Any]:
     }
 
 
+def _llm_settings() -> dict[str, Any]:
+    values = shadow_review.llm_settings()
+    return {
+        "llm_base_url": values["base_url"],
+        "llm_model": values["model"],
+        "llm_key_masked": _masked(values["api_key"]),
+        "llm_configured": bool(
+            values["base_url"] and values["api_key"] and values["model"]
+        ),
+    }
+
+
 @app.get("/api/settings")
 def get_settings() -> dict[str, Any]:
     return {
         "whisper_model": db.get_setting("whisper_model", "small.en"),
         "daily_new_limit": int(db.get_setting("daily_new_limit", "20") or 20),
         **_speech_settings(),
+        **_llm_settings(),
         "models": WHISPER_MODELS,
     }
 
@@ -670,6 +688,9 @@ class SettingsPatch(BaseModel):
     tencent_speech_app_id: str | None = Field(default=None, max_length=32)
     tencent_speech_secret_id: str | None = Field(default=None, max_length=128)
     tencent_speech_secret_key: str | None = Field(default=None, max_length=128)
+    llm_base_url: str | None = Field(default=None, max_length=300)
+    llm_api_key: str | None = Field(default=None, max_length=300)
+    llm_model: str | None = Field(default=None, max_length=100)
 
 
 @app.patch("/api/settings")
@@ -712,4 +733,15 @@ def patch_settings(payload: SettingsPatch) -> dict[str, Any]:
                 status_code=400, detail="腾讯云 SecretKey 看起来不完整"
             )
         db.set_setting("tencent_speech_secret_key", secret_key)
+    if payload.llm_base_url is not None:
+        base_url = payload.llm_base_url.strip()
+        if base_url and not re.fullmatch(r"https?://[^\s]+", base_url):
+            raise HTTPException(
+                status_code=400, detail="AI Base URL 必须以 http:// 或 https:// 开头"
+            )
+        db.set_setting("llm_base_url", base_url)
+    if payload.llm_api_key is not None:
+        db.set_setting("llm_api_key", payload.llm_api_key.strip())
+    if payload.llm_model is not None:
+        db.set_setting("llm_model", payload.llm_model.strip())
     return get_settings()

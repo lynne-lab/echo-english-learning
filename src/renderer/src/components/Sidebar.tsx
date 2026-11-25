@@ -151,7 +151,7 @@ export default function Sidebar({
           <ShieldCheck size={15} />
           <span>本地运行 · 离线优先</span>
         </div>
-        <div className="version">v0.9.1 · 学习笔记</div>
+        <div className="version">v0.10.0 · AI 复盘</div>
       </div>
     </aside>
   )

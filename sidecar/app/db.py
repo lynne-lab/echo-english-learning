@@ -182,6 +182,16 @@ CREATE TABLE IF NOT EXISTS study_plan_tasks (
     PRIMARY KEY (plan_id, day, kind)
 ) WITHOUT ROWID;
 
+CREATE TABLE IF NOT EXISTS shadow_reviews (
+    id TEXT PRIMARY KEY,
+    material_id TEXT NOT NULL,
+    material_title TEXT NOT NULL DEFAULT '',
+    model TEXT NOT NULL DEFAULT '',
+    coverage_json TEXT NOT NULL DEFAULT '{}',
+    report_markdown TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+
 CREATE INDEX IF NOT EXISTS idx_sentences_material ON sentences(material_id, idx);
 CREATE INDEX IF NOT EXISTS idx_occurrences_word ON word_occurrences(word_id);
 CREATE INDEX IF NOT EXISTS idx_occurrences_sentence ON word_occurrences(sentence_id);
@@ -191,6 +201,8 @@ CREATE INDEX IF NOT EXISTS idx_dictation_sessions_created ON dictation_sessions(
 CREATE INDEX IF NOT EXISTS idx_dictation_attempts_session ON dictation_attempts(session_id);
 CREATE INDEX IF NOT EXISTS idx_recordings_sentence ON recordings(sentence_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_recordings_material ON recordings(material_id);
+CREATE INDEX IF NOT EXISTS idx_shadow_reviews_material
+    ON shadow_reviews(material_id, created_at DESC);
 """
 
 MATERIAL_FIELDS = {

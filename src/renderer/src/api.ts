@@ -19,6 +19,9 @@ import type {
   ReviewRateResult,
   ReviewSummary,
   Sentence,
+  ShadowCoverage,
+  ShadowReview,
+  ShadowReviewSummary,
   Stats,
   StudyPlanResponse,
   WordEntry
@@ -135,6 +138,9 @@ export const api = {
     tencent_speech_app_id?: string
     tencent_speech_secret_id?: string
     tencent_speech_secret_key?: string
+    llm_base_url?: string
+    llm_api_key?: string
+    llm_model?: string
   }) =>
     request<AppSettings>('/api/settings', {
       method: 'PATCH',
@@ -210,6 +216,29 @@ export const api = {
     request<PronunciationFeedback>(`/api/recordings/${recordingId}/azure-score`, {
       method: 'POST'
     }),
+
+  shadowCoverage: (materialId: string) =>
+    request<ShadowCoverage>(
+      `/api/shadowing/${encodeURIComponent(materialId)}/coverage`
+    ),
+  generateShadowReview: (materialId: string) =>
+    request<ShadowReview>(
+      `/api/shadowing/${encodeURIComponent(materialId)}/review`,
+      { method: 'POST' }
+    ),
+  shadowReviews: (materialId: string) =>
+    request<ShadowReviewSummary[]>(
+      `/api/shadowing/${encodeURIComponent(materialId)}/reviews`
+    ),
+  shadowReview: (reviewId: string) =>
+    request<ShadowReview>(
+      `/api/shadowing/reviews/${encodeURIComponent(reviewId)}`
+    ),
+  deleteShadowReview: (reviewId: string) =>
+    request<{ ok: boolean }>(
+      `/api/shadowing/reviews/${encodeURIComponent(reviewId)}`,
+      { method: 'DELETE' }
+    ),
 
   progress: (module: 'player' | 'shadowing', materialId: string) =>
     request<LearningProgress | null>(`/api/progress/${module}/${materialId}`),

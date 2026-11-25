@@ -402,7 +402,46 @@ export interface AppSettings {
   tencent_secret_key_masked: string | null
   pronunciation_provider: PronunciationProvider | null
   pronunciation_configured: boolean
+  llm_base_url: string
+  llm_model: string
+  llm_key_masked: string | null
+  llm_configured: boolean
   models: WhisperModel[]
+}
+
+export interface ShadowCoverage {
+  material_id: string
+  material_title: string
+  sentence_count: number
+  recorded: number
+  local_scored: number
+  phoneme_scored: number
+  phoneme_providers: Record<string, number>
+  all_recorded: boolean
+  llm_configured: boolean
+  llm_model: string
+}
+
+export interface ShadowReviewSummary {
+  id: string
+  material_id: string
+  material_title: string
+  model: string
+  coverage: {
+    recorded?: number
+    local_scored?: number
+    phoneme_scored?: number
+    phoneme_providers?: Record<string, number>
+  }
+  created_at: string
+}
+
+export interface ShadowReview extends ShadowReviewSummary {
+  overall?: {
+    mean_local_accuracy_pct?: number | null
+    mean_pron_score?: number | null
+  }
+  report_markdown: string
 }
 
 export interface AppInfo {

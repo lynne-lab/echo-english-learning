@@ -35,7 +35,8 @@ import type {
   PronunciationProvider,
   Recording,
   RecordingFeedback,
-  Sentence
+  Sentence,
+  ShadowCoverage
 } from '../types'
 import { errorMessage, formatDate } from '../utils'
 
@@ -139,6 +140,7 @@ export default function ShadowingPage(): ReactElement {
     useState<PronunciationProvider | null>(null)
   const [micError, setMicError] = useState<string | null>(null)
   const [audioError, setAudioError] = useState<string | null>(null)
+  const [coverage, setCoverage] = useState<ShadowCoverage | null>(null)
 
   const [originalPeaks, setOriginalPeaks] = useState<number[] | null>(null)
   const [originalDuration, setOriginalDuration] = useState(0)
@@ -197,6 +199,28 @@ export default function ShadowingPage(): ReactElement {
       })
       .catch(() => undefined)
   }, [])
+
+  useEffect(() => {
+    if (!id) return
+    let cancelled = false
+    api
+      .shadowCoverage(id)
+      .then((value) => {
+        if (!cancelled) setCoverage(value)
+      })
+      .catch(() => undefined)
+    return () => {
+      cancelled = true
+    }
+  }, [id])
+
+  const refreshCoverage = (): void => {
+    if (!id) return
+    api
+      .shadowCoverage(id)
+      .then(setCoverage)
+      .catch(() => undefined)
+  }
 
   useEffect(() => {
     if (!id) return
@@ -531,6 +555,7 @@ export default function ShadowingPage(): ReactElement {
       setSelectedId(recording.id)
       setFeedback(recording.feedback)
       setPronunciationResult(pronunciationOf(recording))
+      refreshCoverage()
       push('跟读录音已保存', 'success')
     } catch (error) {
       push(errorMessage(error), 'error')
@@ -603,6 +628,7 @@ export default function ShadowingPage(): ReactElement {
         setFeedback(next?.feedback ?? null)
         setPronunciationResult(next ? pronunciationOf(next) : null)
       }
+      refreshCoverage()
       push('已删除录音', 'success')
     } catch (error) {
       push(errorMessage(error), 'error')
@@ -627,6 +653,7 @@ export default function ShadowingPage(): ReactElement {
             : recording
         )
       )
+      refreshCoverage()
       push('本地评测完成', 'success')
     } catch (error) {
       push(errorMessage(error), 'error')
@@ -669,6 +696,7 @@ export default function ShadowingPage(): ReactElement {
             : recording
         )
       )
+      refreshCoverage()
       push('音素评分完成', 'success')
     } catch (error) {
       push(errorMessage(error), 'error')
@@ -772,6 +800,13 @@ export default function ShadowingPage(): ReactElement {
           </div>
         </div>
         <div className="shadow-header-actions">
+          <Link
+            className="btn-icon"
+            to={`/shadow/${material.id}/review`}
+            title="跟读复盘"
+          >
+            <Sparkles size={18} />
+          </Link>
           <select
             className="sentence-jump"
             value={index}
@@ -829,6 +864,33 @@ export default function ShadowingPage(): ReactElement {
           <AlertCircle size={16} />
           <span>{audioError}</span>
         </div>
+      ) : null}
+
+      {coverage && coverage.recorded > 0 ? (
+        <section
+          className={`shadow-review-strip${coverage.all_recorded ? ' ready' : ''}`}
+        >
+          <div className="shadow-review-strip-info">
+            <Sparkles size={16} />
+            <div>
+              <strong>
+                {coverage.all_recorded
+                  ? '全篇跟读已完成，可以生成复盘了'
+                  : `已录 ${coverage.recorded}/${coverage.sentence_count} 句`}
+              </strong>
+              <span>
+                本地评测 {coverage.local_scored} 句 · 音素评分{' '}
+                {coverage.phoneme_scored} 句
+              </span>
+            </div>
+          </div>
+          <Link
+            className="btn btn-small"
+            to={`/shadow/${material.id}/review`}
+          >
+            跟读复盘 <ChevronRight size={14} />
+          </Link>
+        </section>
       ) : null}
 
       <section className="shadow-practice-card">

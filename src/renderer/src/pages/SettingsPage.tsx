@@ -11,7 +11,8 @@ import {
   RefreshCw,
   Repeat2,
   Server,
-  SlidersHorizontal
+  SlidersHorizontal,
+  Sparkles
 } from 'lucide-react'
 import { api } from '../api'
 import { useToast } from '../components/Toast'
@@ -39,6 +40,10 @@ export default function SettingsPage(): ReactElement {
   const [tencentSecretId, setTencentSecretId] = useState('')
   const [tencentSecretKey, setTencentSecretKey] = useState('')
   const [tencentSaving, setTencentSaving] = useState(false)
+  const [llmBaseUrl, setLlmBaseUrl] = useState('')
+  const [llmModel, setLlmModel] = useState('')
+  const [llmKey, setLlmKey] = useState('')
+  const [llmSaving, setLlmSaving] = useState(false)
 
   const load = async (): Promise<void> => {
     setLoading(true)
@@ -54,6 +59,8 @@ export default function SettingsPage(): ReactElement {
       setAppInfo(info)
       setAzureRegion(nextSettings.azure_speech_region)
       setTencentAppId(nextSettings.tencent_app_id)
+      setLlmBaseUrl(nextSettings.llm_base_url)
+      setLlmModel(nextSettings.llm_model)
     } catch (loadError) {
       setError(errorMessage(loadError))
     } finally {
@@ -195,6 +202,63 @@ export default function SettingsPage(): ReactElement {
       push(errorMessage(tencentError), 'error')
     } finally {
       setTencentSaving(false)
+    }
+  }
+
+  const handleLlmSave = async (): Promise<void> => {
+    if (!settings) return
+    const baseUrl = llmBaseUrl.trim()
+    const model = llmModel.trim()
+    const key = llmKey.trim()
+    if (!/^https?:\/\/\S+$/i.test(baseUrl)) {
+      push('Base URL 必须以 http:// 或 https:// 开头', 'error')
+      return
+    }
+    if (!model) {
+      push('请填写模型名称，例如 deepseek-chat', 'error')
+      return
+    }
+    if (!key && !settings.llm_configured) {
+      push('请填写 API Key', 'error')
+      return
+    }
+    setLlmSaving(true)
+    try {
+      const updated = await api.patchSettings({
+        llm_base_url: baseUrl,
+        llm_model: model,
+        ...(key ? { llm_api_key: key } : {})
+      })
+      setSettings(updated)
+      setLlmBaseUrl(updated.llm_base_url)
+      setLlmModel(updated.llm_model)
+      setLlmKey('')
+      push('AI 复盘配置已保存', 'success')
+    } catch (llmError) {
+      push(errorMessage(llmError), 'error')
+    } finally {
+      setLlmSaving(false)
+    }
+  }
+
+  const handleLlmClear = async (): Promise<void> => {
+    if (!window.confirm('清除 AI 复盘配置？之后无法生成跟读复盘。')) return
+    setLlmSaving(true)
+    try {
+      const updated = await api.patchSettings({
+        llm_api_key: '',
+        llm_base_url: '',
+        llm_model: ''
+      })
+      setSettings(updated)
+      setLlmBaseUrl(updated.llm_base_url)
+      setLlmModel(updated.llm_model)
+      setLlmKey('')
+      push('已清除 AI 复盘配置', 'success')
+    } catch (llmError) {
+      push(errorMessage(llmError), 'error')
+    } finally {
+      setLlmSaving(false)
     }
   }
 
@@ -581,6 +645,92 @@ export default function SettingsPage(): ReactElement {
         <section className="settings-card">
           <div className="settings-card-header">
             <div className="settings-icon">
+              <Sparkles size={18} />
+            </div>
+            <div>
+              <h2>AI 跟读复盘（可选）</h2>
+              <p>用大模型汇总本地与在线评测，生成发音问题和训练方案。</p>
+            </div>
+          </div>
+
+          {settings.llm_configured ? (
+            <p className="dict-status">
+              <CheckCircle2 size={16} /> 已配置 · {settings.llm_model} · 密钥{' '}
+              {settings.llm_key_masked}
+            </p>
+          ) : (
+            <p className="dict-status missing">
+              尚未配置。跟读页可以正常录音和评测，但生成 AI 复盘前需要配置一个模型接口。
+            </p>
+          )}
+
+          <label className="field">
+            <span>Base URL</span>
+            <input
+              value={llmBaseUrl}
+              onChange={(event) => setLlmBaseUrl(event.target.value)}
+              placeholder="https://api.deepseek.com/v1"
+              spellCheck={false}
+            />
+          </label>
+          <label className="field">
+            <span>API Key</span>
+            <input
+              type="password"
+              autoComplete="off"
+              value={llmKey}
+              onChange={(event) => setLlmKey(event.target.value)}
+              placeholder={
+                settings.llm_configured
+                  ? '已保存，留空则不修改'
+                  : '粘贴你的 API Key'
+              }
+            />
+          </label>
+          <label className="field">
+            <span>模型</span>
+            <input
+              value={llmModel}
+              onChange={(event) => setLlmModel(event.target.value)}
+              placeholder="deepseek-chat"
+              spellCheck={false}
+            />
+          </label>
+
+          <div className="settings-actions">
+            <button
+              className="btn btn-primary"
+              onClick={() => void handleLlmSave()}
+              disabled={llmSaving}
+            >
+              {llmSaving ? (
+                <Loader2 size={15} className="spin" />
+              ) : (
+                <Sparkles size={15} />
+              )}
+              保存 AI 配置
+            </button>
+            {settings.llm_configured ? (
+              <button
+                className="btn"
+                onClick={() => void handleLlmClear()}
+                disabled={llmSaving}
+              >
+                清除
+              </button>
+            ) : null}
+          </div>
+
+          <p className="hint">
+            兼容 OpenAI Chat Completions 接口，可填 DeepSeek、OpenAI
+            或其他兼容服务。生成复盘时会把这个素材的句子文本和评分发送给该服务，不上传录音文件；费用由你的
+            API 账户承担。
+          </p>
+        </section>
+
+        <section className="settings-card">
+          <div className="settings-card-header">
+            <div className="settings-icon">
               <FolderOpen size={18} />
             </div>
             <div>
@@ -617,7 +767,7 @@ export default function SettingsPage(): ReactElement {
           </div>
           <div className="settings-row">
             <span className="settings-label">版本</span>
-            <span className="settings-value">v{appInfo?.version ?? '0.9.1'} · 学习笔记</span>
+            <span className="settings-value">v{appInfo?.version ?? '0.10.0'} · AI 复盘</span>
           </div>
           <div className="settings-row">
             <span className="settings-label">技术栈</span>
