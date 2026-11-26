@@ -20,7 +20,7 @@ import EmptyState from '../components/EmptyState'
 import MaterialCard from '../components/MaterialCard'
 import Modal from '../components/Modal'
 import { useToast } from '../components/Toast'
-import type { Material } from '../types'
+import type { Material, MaterialRelated } from '../types'
 import { errorMessage, formatDuration } from '../utils'
 
 export default function LibraryPage(): ReactElement {
@@ -33,6 +33,9 @@ export default function LibraryPage(): ReactElement {
   const [url, setUrl] = useState('')
   const [urlBusy, setUrlBusy] = useState(false)
   const [query, setQuery] = useState('')
+  const [deleteTarget, setDeleteTarget] = useState<Material | null>(null)
+  const [deleteRelated, setDeleteRelated] = useState<MaterialRelated | null>(null)
+  const [deleteBusy, setDeleteBusy] = useState(false)
 
   const load = useCallback(async (): Promise<void> => {
     try {
@@ -113,13 +116,39 @@ export default function LibraryPage(): ReactElement {
   }
 
   const handleDelete = async (material: Material): Promise<void> => {
-    if (!window.confirm(`删除「${material.title}」？生词本里的单词会保留。`)) return
     try {
-      await api.deleteMaterial(material.id)
-      setMaterials((previous) => previous.filter((item) => item.id !== material.id))
-      push('已删除素材', 'success')
+      const related = await api.materialRelated(material.id)
+      setDeleteTarget(material)
+      setDeleteRelated(related)
     } catch (error) {
       push(errorMessage(error), 'error')
+    }
+  }
+
+  const closeDelete = (): void => {
+    if (deleteBusy) return
+    setDeleteTarget(null)
+    setDeleteRelated(null)
+  }
+
+  const confirmDelete = async (keepReviews: boolean): Promise<void> => {
+    if (!deleteTarget || deleteBusy) return
+    setDeleteBusy(true)
+    try {
+      await api.deleteMaterial(deleteTarget.id, keepReviews)
+      setMaterials((previous) =>
+        previous.filter((item) => item.id !== deleteTarget.id)
+      )
+      push(
+        keepReviews ? '已删除素材，复盘记录已保留' : '已删除素材',
+        'success'
+      )
+      setDeleteTarget(null)
+      setDeleteRelated(null)
+    } catch (error) {
+      push(errorMessage(error), 'error')
+    } finally {
+      setDeleteBusy(false)
     }
   }
 
@@ -236,6 +265,75 @@ export default function LibraryPage(): ReactElement {
             </button>
           </div>
         </form>
+      </Modal>
+
+      <Modal
+        open={deleteTarget !== null}
+        title="删除素材"
+        onClose={closeDelete}
+      >
+        {deleteTarget ? (
+          <>
+            <p>
+              删除「{deleteTarget.title}」？生词本里的单词会保留。
+            </p>
+            {deleteRelated && deleteRelated.reviews > 0 ? (
+              <p className="hint">
+                这个素材有
+                {deleteRelated.recordings > 0
+                  ? ` ${deleteRelated.recordings} 条跟读录音、`
+                  : ' '}
+                {deleteRelated.reviews} 份跟读复盘。删除素材会同时删除跟读录音；
+                复盘记录可以选择保留，之后可在跟读首页查看。
+              </p>
+            ) : null}
+            <div className="modal-actions">
+              <button
+                type="button"
+                className="btn"
+                onClick={closeDelete}
+                disabled={deleteBusy}
+              >
+                取消
+              </button>
+              {deleteRelated && deleteRelated.reviews > 0 ? (
+                <>
+                  <button
+                    type="button"
+                    className="btn"
+                    onClick={() => void confirmDelete(false)}
+                    disabled={deleteBusy}
+                  >
+                    一起删除复盘
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    onClick={() => void confirmDelete(true)}
+                    disabled={deleteBusy}
+                  >
+                    {deleteBusy ? (
+                      <Loader2 size={15} className="spin" />
+                    ) : null}
+                    保留复盘并删除
+                  </button>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={() => void confirmDelete(false)}
+                  disabled={deleteBusy}
+                >
+                  {deleteBusy ? (
+                    <Loader2 size={15} className="spin" />
+                  ) : null}
+                  删除素材
+                </button>
+              )}
+            </div>
+          </>
+        ) : null}
       </Modal>
     </div>
   )

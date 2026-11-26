@@ -16,6 +16,11 @@ export interface Material {
   sentence_count: number
 }
 
+export interface MaterialRelated {
+  recordings: number
+  reviews: number
+}
+
 export interface Sentence {
   id: string
   material_id: string
@@ -420,6 +425,13 @@ export interface ShadowCoverage {
   all_recorded: boolean
   llm_configured: boolean
   llm_model: string
+}
+
+export interface ShadowArchive {
+  material_id: string
+  material_title: string
+  review_count: number
+  last_created_at: string
 }
 
 export interface ShadowReviewSummary {

@@ -527,6 +527,32 @@ def generate(material_id: str) -> dict[str, Any]:
     return report
 
 
+def archives() -> list[dict[str, Any]]:
+    """Review groups kept after their material was deleted."""
+    with db.get_conn() as conn:
+        rows = conn.execute(
+            """
+            SELECT material_id,
+                   MAX(material_title) AS material_title,
+                   COUNT(*) AS review_count,
+                   MAX(created_at) AS last_created_at
+            FROM shadow_reviews
+            WHERE material_id NOT IN (SELECT id FROM materials)
+            GROUP BY material_id
+            ORDER BY last_created_at DESC
+            """
+        ).fetchall()
+    return [
+        {
+            "material_id": row["material_id"],
+            "material_title": row["material_title"],
+            "review_count": int(row["review_count"]),
+            "last_created_at": row["last_created_at"],
+        }
+        for row in rows
+    ]
+
+
 def list_reviews(material_id: str, limit: int = 20) -> list[dict[str, Any]]:
     with db.get_conn() as conn:
         rows = conn.execute(

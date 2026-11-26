@@ -9,6 +9,11 @@ from . import llm, shadow_review
 router = APIRouter(prefix="/api/shadowing", tags=["shadow-review"])
 
 
+@router.get("/archives")
+def list_archives() -> list[dict[str, Any]]:
+    return shadow_review.archives()
+
+
 @router.get("/{material_id}/coverage")
 def get_coverage(material_id: str) -> dict[str, Any]:
     try:

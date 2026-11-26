@@ -36,7 +36,7 @@ MODEL_IDS = {model["id"] for model in WHISPER_MODELS}
 # Bump when the clip extraction logic changes so stale WAVs are ignored.
 CLIP_VERSION = 2
 
-app = FastAPI(title="Echo Sidecar", version="0.10.6")
+app = FastAPI(title="Echo Sidecar", version="0.10.7")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -61,7 +61,7 @@ app.include_router(shadow_review_router)
 def health() -> dict[str, Any]:
     return {
         "ok": True,
-        "version": "0.10.6",
+        "version": "0.10.7",
         "whisper_model": db.get_setting("whisper_model", "small.en"),
         "device": runtime.get("device") or "auto",
         "model_loaded": runtime.get("model"),
@@ -179,8 +179,25 @@ def patch_material(material_id: str, payload: MaterialPatch) -> dict[str, Any]:
     return _material_or_404(material_id)
 
 
+@app.get("/api/materials/{material_id}/related")
+def get_material_related(material_id: str) -> dict[str, int]:
+    _material_or_404(material_id)
+    with db.get_conn() as conn:
+        recordings = conn.execute(
+            "SELECT COUNT(*) FROM recordings WHERE material_id = ?",
+            (material_id,),
+        ).fetchone()[0]
+        reviews = conn.execute(
+            "SELECT COUNT(*) FROM shadow_reviews WHERE material_id = ?",
+            (material_id,),
+        ).fetchone()[0]
+    return {"recordings": int(recordings), "reviews": int(reviews)}
+
+
 @app.delete("/api/materials/{material_id}")
-def delete_material(material_id: str) -> dict[str, bool]:
+def delete_material(
+    material_id: str, keep_reviews: bool = False
+) -> dict[str, Any]:
     material = _material_or_404(material_id)
 
     if config.settings is not None:
@@ -211,9 +228,10 @@ def delete_material(material_id: str) -> dict[str, bool]:
 
     with db.get_conn() as conn:
         conn.execute("DELETE FROM recordings WHERE material_id = ?", (material_id,))
-        conn.execute(
-            "DELETE FROM shadow_reviews WHERE material_id = ?", (material_id,)
-        )
+        if not keep_reviews:
+            conn.execute(
+                "DELETE FROM shadow_reviews WHERE material_id = ?", (material_id,)
+            )
         conn.execute("DELETE FROM materials WHERE id = ?", (material_id,))
 
     if material.get("source_type") == "url" and config.settings is not None:

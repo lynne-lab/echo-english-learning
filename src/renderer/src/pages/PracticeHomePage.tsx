@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import {
   CalendarRange,
   ChevronRight,
+  FileText,
   Film,
   Headphones,
   Loader2,
@@ -11,8 +12,8 @@ import {
 } from 'lucide-react'
 import { api } from '../api'
 import EmptyState from '../components/EmptyState'
-import type { LearningProgress, Material } from '../types'
-import { errorMessage, formatDuration } from '../utils'
+import type { LearningProgress, Material, ShadowArchive } from '../types'
+import { errorMessage, formatDate, formatDuration } from '../utils'
 
 type PracticeMode = 'player' | 'shadowing'
 
@@ -46,6 +47,7 @@ export default function PracticeHomePage({
   const [materials, setMaterials] = useState<Material[]>([])
   const [progress, setProgress] = useState<LearningProgress[]>([])
   const [planMaterialId, setPlanMaterialId] = useState<string | null>(null)
+  const [archives, setArchives] = useState<ShadowArchive[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -56,13 +58,17 @@ export default function PracticeHomePage({
     Promise.all([
       api.materials(),
       api.progressList(mode).catch(() => [] as LearningProgress[]),
-      api.studyPlan().catch(() => null)
+      api.studyPlan().catch(() => null),
+      mode === 'shadowing'
+        ? api.shadowArchives().catch(() => [] as ShadowArchive[])
+        : Promise.resolve([] as ShadowArchive[])
     ])
-      .then(([nextMaterials, nextProgress, plan]) => {
+      .then(([nextMaterials, nextProgress, plan, nextArchives]) => {
         if (cancelled) return
         setMaterials(nextMaterials)
         setProgress(nextProgress)
         setPlanMaterialId(plan?.plan?.material?.id ?? null)
+        setArchives(nextArchives)
       })
       .catch((loadError) => {
         if (!cancelled) setError(errorMessage(loadError))
@@ -116,7 +122,7 @@ export default function PracticeHomePage({
           <h2>加载失败</h2>
           <p className="status-error">{error}</p>
         </div>
-      ) : readyMaterials.length === 0 ? (
+      ) : readyMaterials.length === 0 && archives.length === 0 ? (
         <EmptyState
           icon={<Icon size={30} />}
           title={`还没有可以${copy.action}的素材`}
@@ -127,6 +133,8 @@ export default function PracticeHomePage({
           </Link>
         </EmptyState>
       ) : (
+        <>
+        {readyMaterials.length > 0 ? (
         <section className="panel">
           <header className="section-head">
             <div>
@@ -183,6 +191,42 @@ export default function PracticeHomePage({
             })}
           </div>
         </section>
+        ) : null}
+
+        {archives.length > 0 ? (
+          <section className="panel">
+            <header className="section-head">
+              <div>
+                <h2>已删除素材的复盘</h2>
+                <p>这些素材已从素材库删除，跟读复盘记录仍然保留。</p>
+              </div>
+              <span className="section-count">{archives.length} 个</span>
+            </header>
+            <div className="dictation-material-list">
+              {archives.map((archive) => (
+                <div className="dictation-material-row" key={archive.material_id}>
+                  <div className="material-icon">
+                    <FileText size={20} />
+                  </div>
+                  <div className="dictation-material-info">
+                    <h3>{archive.material_title}</h3>
+                    <p>
+                      素材已删除 · {archive.review_count} 份复盘 · 最近{' '}
+                      {formatDate(archive.last_created_at)}
+                    </p>
+                  </div>
+                  <Link
+                    className="btn btn-small"
+                    to={`/shadow/${archive.material_id}/review`}
+                  >
+                    跟读复盘记录 <ChevronRight size={14} />
+                  </Link>
+                </div>
+              ))}
+            </div>
+          </section>
+        ) : null}
+        </>
       )}
     </div>
   )

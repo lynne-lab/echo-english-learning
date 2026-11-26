@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactElement } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import Markdown, { type Components } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import {
@@ -52,6 +52,7 @@ function ProviderText({
 export default function ShadowingReviewPage(): ReactElement {
   const { id } = useParams<{ id: string }>()
   const { push } = useToast()
+  const navigate = useNavigate()
 
   const [material, setMaterial] = useState<Material | null>(null)
   const [coverage, setCoverage] = useState<ShadowCoverage | null>(null)
@@ -74,21 +75,26 @@ export default function ShadowingReviewPage(): ReactElement {
     setSelected(null)
     setGenerateError(null)
     setLoadingReportId(null)
-    Promise.all([
-      api.material(id),
-      api.shadowCoverage(id),
-      api.shadowReviews(id)
-    ])
-      .then(async ([nextMaterial, nextCoverage, nextReviews]) => {
-        if (cancelled) return
-        setMaterial(nextMaterial)
-        setCoverage(nextCoverage)
-        setReviews(nextReviews)
-        if (nextReviews[0]) {
-          const full = await api.shadowReview(nextReviews[0].id).catch(() => null)
-          if (!cancelled && full) setSelected(full)
-        }
-      })
+    const load = async (): Promise<void> => {
+      // A material can be deleted while its review reports are kept, so the
+      // material lookup is allowed to fail while the report list still loads.
+      const [nextMaterial, nextReviews] = await Promise.all([
+        api.material(id).catch(() => null),
+        api.shadowReviews(id).catch(() => [])
+      ])
+      if (cancelled) return
+      setMaterial(nextMaterial)
+      setReviews(nextReviews)
+      if (nextMaterial) {
+        const nextCoverage = await api.shadowCoverage(id).catch(() => null)
+        if (!cancelled) setCoverage(nextCoverage)
+      }
+      if (nextReviews[0]) {
+        const full = await api.shadowReview(nextReviews[0].id).catch(() => null)
+        if (!cancelled && full) setSelected(full)
+      }
+    }
+    void load()
       .catch((error) => {
         if (!cancelled) setLoadError(errorMessage(error))
       })
@@ -161,6 +167,8 @@ export default function ShadowingReviewPage(): ReactElement {
             .shadowReview(remaining[0].id)
             .then(setSelected)
             .catch(() => undefined)
+        } else if (!material) {
+          navigate('/shadowing')
         }
       }
       push('已删除复盘报告', 'success')
@@ -179,7 +187,7 @@ export default function ShadowingReviewPage(): ReactElement {
     )
   }
 
-  if (loadError || !material) {
+  if (loadError || (!material && reviews.length === 0)) {
     return (
       <div className="page">
         <div className="status-panel">
@@ -193,6 +201,9 @@ export default function ShadowingReviewPage(): ReactElement {
     )
   }
 
+  const archived = !material
+  const title =
+    material?.title ?? selected?.material_title ?? reviews[0]?.material_title ?? '已删除的素材'
   const llmConfigured = coverage?.llm_configured ?? false
   const recorded = coverage?.recorded ?? 0
   const canGenerate = llmConfigured && recorded > 0 && !generating
@@ -200,34 +211,58 @@ export default function ShadowingReviewPage(): ReactElement {
   return (
     <div className="page shadow-page">
       <header className="shadow-header">
-        <Link to={`/shadow/${material.id}`} className="btn-icon" title="返回跟读">
+        <Link
+          to={material ? `/shadow/${material.id}` : '/shadowing'}
+          className="btn-icon"
+          title={material ? '返回跟读' : '返回跟读首页'}
+        >
           <ArrowLeft size={19} />
         </Link>
         <div className="shadow-header-title">
-          <div className="eyebrow">SHADOW REVIEW</div>
-          <h1>跟读复盘</h1>
+          <div className="eyebrow">
+            {archived ? 'SHADOW REVIEW · ARCHIVED' : 'SHADOW REVIEW'}
+          </div>
+          <h1>{archived ? '跟读复盘记录' : '跟读复盘'}</h1>
           <div className="player-meta">
-            <span>{material.title}</span>
+            <span>{title}</span>
             <span className="dot-separator">·</span>
-            <span>
-              {coverage?.sentence_count ?? material.sentence_count} 句
-            </span>
-            {coverage ? (
+            {archived ? (
+              <span>素材已删除 · {reviews.length} 份复盘</span>
+            ) : (
               <>
-                <span className="dot-separator">·</span>
-                <span>已录 {coverage.recorded} 句</span>
+                <span>
+                  {coverage?.sentence_count ?? material?.sentence_count ?? 0} 句
+                </span>
+                {coverage ? (
+                  <>
+                    <span className="dot-separator">·</span>
+                    <span>已录 {coverage.recorded} 句</span>
+                  </>
+                ) : null}
               </>
-            ) : null}
+            )}
           </div>
         </div>
         <div className="shadow-header-actions">
-          <Link className="btn btn-small" to={`/shadow/${material.id}`}>
-            继续跟读
-          </Link>
+          {material ? (
+            <Link className="btn btn-small" to={`/shadow/${material.id}`}>
+              继续跟读
+            </Link>
+          ) : null}
         </div>
       </header>
 
-      {coverage ? (
+      {archived ? (
+        <div className="review-notice">
+          <AlertCircle size={16} />
+          <div>
+            <strong>素材已从素材库删除</strong>
+            <p>跟读录音已删除，复盘报告仍然保留，可以继续查看或删除。</p>
+          </div>
+        </div>
+      ) : null}
+
+      {material && coverage ? (
         <section className="panel review-hero">
           <div className="review-hero-main">
             <div className="review-hero-icon">
@@ -272,7 +307,7 @@ export default function ShadowingReviewPage(): ReactElement {
         </section>
       ) : null}
 
-      {!llmConfigured ? (
+      {material && coverage && !llmConfigured ? (
         <div className="review-notice">
           <AlertCircle size={16} />
           <div>

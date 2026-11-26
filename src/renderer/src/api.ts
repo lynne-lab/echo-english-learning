@@ -10,6 +10,7 @@ import type {
   Health,
   LearningProgress,
   Material,
+  MaterialRelated,
   ModuleState,
   PronunciationFeedback,
   Recording,
@@ -19,6 +20,7 @@ import type {
   ReviewRateResult,
   ReviewSummary,
   Sentence,
+  ShadowArchive,
   ShadowCoverage,
   ShadowReview,
   ShadowReviewSummary,
@@ -100,8 +102,13 @@ export const api = {
       method: 'PATCH',
       body: JSON.stringify({ title })
     }),
-  deleteMaterial: (id: string) =>
-    request<{ ok: boolean }>(`/api/materials/${id}`, { method: 'DELETE' }),
+  deleteMaterial: (id: string, keepReviews = false) =>
+    request<{ ok: boolean }>(
+      `/api/materials/${id}${keepReviews ? '?keep_reviews=1' : ''}`,
+      { method: 'DELETE' }
+    ),
+  materialRelated: (id: string) =>
+    request<MaterialRelated>(`/api/materials/${id}/related`),
   retryMaterial: (id: string) =>
     request<Material>(`/api/materials/${id}/retry`, { method: 'POST' }),
 
@@ -233,6 +240,8 @@ export const api = {
     request<ShadowReviewSummary[]>(
       `/api/shadowing/${encodeURIComponent(materialId)}/reviews`
     ),
+  shadowArchives: () =>
+    request<ShadowArchive[]>('/api/shadowing/archives'),
   shadowReview: (reviewId: string) =>
     request<ShadowReview>(
       `/api/shadowing/reviews/${encodeURIComponent(reviewId)}`
