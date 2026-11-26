@@ -81,42 +81,48 @@ export default function ReviewPage(): ReactElement {
   const current = cards[index] ?? null
   const done = index >= cards.length
 
-  const loadQueue = useCallback(async (): Promise<void> => {
-    setLoading(true)
-    setError(null)
-    try {
-      const [data, saved] = await Promise.all([
-        api.reviewQueue(20),
-        api
-          .moduleState<{
-            word_id?: string | null
-            revealed?: boolean
-            ratings?: number[]
-          }>('review')
-          .catch(() => null)
-      ])
-      setCards(data.cards)
-      setSummary(data.summary)
-      const savedState = saved?.state
-      const savedWord = savedState?.word_id ?? null
-      const savedIndex = savedWord
-        ? data.cards.findIndex((card) => card.word_id === savedWord)
-        : -1
-      setIndex(savedIndex >= 0 ? savedIndex : 0)
-      setRevealed(savedIndex >= 0 ? Boolean(savedState?.revealed) : false)
-      setSessionRatings(
-        savedIndex >= 0 && Array.isArray(savedState?.ratings)
-          ? savedState.ratings
-          : []
-      )
-      setPreviews([])
-      window.dispatchEvent(new Event('echo:review-changed'))
-    } catch (loadError) {
-      setError(errorMessage(loadError))
-    } finally {
-      setLoading(false)
-    }
-  }, [])
+  const loadQueue = useCallback(
+    async (ahead = false): Promise<void> => {
+      setLoading(true)
+      setError(null)
+      try {
+        const [data, saved] = await Promise.all([
+          api.reviewQueue(20, ahead),
+          api
+            .moduleState<{
+              word_id?: string | null
+              revealed?: boolean
+              ratings?: number[]
+            }>('review')
+            .catch(() => null)
+        ])
+        if (ahead && data.cards.length === 0) {
+          push('没有更多可以复习的单词了', 'info')
+        }
+        setCards(data.cards)
+        setSummary(data.summary)
+        const savedState = saved?.state
+        const savedWord = savedState?.word_id ?? null
+        const savedIndex = savedWord
+          ? data.cards.findIndex((card) => card.word_id === savedWord)
+          : -1
+        setIndex(savedIndex >= 0 ? savedIndex : 0)
+        setRevealed(savedIndex >= 0 ? Boolean(savedState?.revealed) : false)
+        setSessionRatings(
+          savedIndex >= 0 && Array.isArray(savedState?.ratings)
+            ? savedState.ratings
+            : []
+        )
+        setPreviews([])
+        window.dispatchEvent(new Event('echo:review-changed'))
+      } catch (loadError) {
+        setError(errorMessage(loadError))
+      } finally {
+        setLoading(false)
+      }
+    },
+    [push]
+  )
 
   useEffect(() => {
     void loadQueue()
@@ -330,7 +336,11 @@ export default function ReviewPage(): ReactElement {
           ) : null}
 
           <div className="done-actions">
-            <button className="btn btn-primary" onClick={() => void loadQueue()}>
+            <button
+              className="btn btn-primary"
+              onClick={() => void loadQueue(true)}
+              title="提前复习还没到期的单词"
+            >
               <RefreshCw size={16} /> 继续复习
             </button>
             <Link className="btn" to="/dictation">

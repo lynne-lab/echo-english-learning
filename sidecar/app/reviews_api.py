@@ -122,7 +122,10 @@ def get_summary() -> dict[str, Any]:
 
 
 @router.get("/queue")
-def get_queue(limit: int = Query(default=20, ge=1, le=100)) -> dict[str, Any]:
+def get_queue(
+    limit: int = Query(default=20, ge=1, le=100),
+    ahead: bool = False,
+) -> dict[str, Any]:
     now = srs.now_utc().isoformat()
     with db.get_conn() as conn:
         due_rows = conn.execute(
@@ -154,6 +157,24 @@ def get_queue(limit: int = Query(default=20, ge=1, le=100)) -> dict[str, Any]:
             ).fetchall()
 
         rows = list(due_rows) + list(new_rows)
+        if ahead and len(rows) < limit:
+            # "继续复习": today's queue is finished, so pull cards that are not
+            # due yet. Cards already reviewed today go last so the learner is
+            # not shown the same words again right away while older ones exist.
+            future_rows = conn.execute(
+                """
+                SELECT rc.*, w.lemma, w.phonetic, w.translation, w.definition
+                FROM review_cards rc
+                JOIN words w ON w.id = rc.word_id
+                WHERE rc.last_review IS NOT NULL AND rc.due > ?
+                ORDER BY CASE WHEN rc.last_review >= ? THEN 1 ELSE 0 END ASC,
+                         rc.due ASC
+                LIMIT ?
+                """,
+                (now, _local_day_start(), limit - len(rows)),
+            ).fetchall()
+            rows += list(future_rows)
+
         occurrences = _occurrences(conn, [row["word_id"] for row in rows])
         cards = [_card(row, occurrences.get(row["word_id"])) for row in rows]
         summary = _summary(conn)

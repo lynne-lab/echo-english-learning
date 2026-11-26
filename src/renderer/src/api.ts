@@ -153,7 +153,10 @@ export const api = {
     }),
 
   reviewsSummary: () => request<ReviewSummary>('/api/reviews/summary'),
-  reviewQueue: (limit = 20) => request<ReviewQueue>(`/api/reviews/queue?limit=${limit}`),
+  reviewQueue: (limit = 20, ahead = false) =>
+    request<ReviewQueue>(
+      `/api/reviews/queue?limit=${limit}${ahead ? '&ahead=1' : ''}`
+    ),
   reviewPreview: (wordId: string) =>
     request<ReviewPreview>(`/api/reviews/${wordId}/preview`),
   rateReview: (wordId: string, rating: number, durationMs?: number) =>

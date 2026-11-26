@@ -36,7 +36,7 @@ MODEL_IDS = {model["id"] for model in WHISPER_MODELS}
 # Bump when the clip extraction logic changes so stale WAVs are ignored.
 CLIP_VERSION = 2
 
-app = FastAPI(title="Echo Sidecar", version="0.10.1")
+app = FastAPI(title="Echo Sidecar", version="0.10.6")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -61,7 +61,7 @@ app.include_router(shadow_review_router)
 def health() -> dict[str, Any]:
     return {
         "ok": True,
-        "version": "0.10.1",
+        "version": "0.10.6",
         "whisper_model": db.get_setting("whisper_model", "small.en"),
         "device": runtime.get("device") or "auto",
         "model_loaded": runtime.get("model"),

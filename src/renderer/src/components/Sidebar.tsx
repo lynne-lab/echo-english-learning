@@ -43,6 +43,20 @@ export default function Sidebar({
   const navigate = useNavigate()
   const [dueCount, setDueCount] = useState(0)
   const [dictationPath, setDictationPath] = useState<string | null>(null)
+  const [appVersion, setAppVersion] = useState('')
+
+  useEffect(() => {
+    let cancelled = false
+    window.api
+      ?.getAppInfo()
+      .then((info) => {
+        if (!cancelled) setAppVersion(info.version)
+      })
+      .catch(() => undefined)
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   useEffect(() => {
     let cancelled = false
@@ -151,7 +165,9 @@ export default function Sidebar({
           <ShieldCheck size={15} />
           <span>本地运行 · 离线优先</span>
         </div>
-        <div className="version">v0.10.1 · AI 复盘</div>
+        <div className="version">
+          {appVersion ? `v${appVersion} · AI 复盘` : 'AI 复盘'}
+        </div>
       </div>
     </aside>
   )
