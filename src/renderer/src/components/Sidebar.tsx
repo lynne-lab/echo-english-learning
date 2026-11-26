@@ -21,7 +21,6 @@ import {
 import { api } from '../api'
 
 const items = [
-  { to: '/library', label: '素材库', icon: LibraryBig },
   { to: '/plan', label: '学习计划', icon: CalendarRange },
   { to: '/listening', label: '精听', icon: Headphones, match: ['/player/'] },
   { to: '/shadowing', label: '跟读', icon: Mic, match: ['/shadow/'] },
@@ -29,6 +28,7 @@ const items = [
   { to: '/dictation', label: '默写', icon: PenLine },
   { to: '/words', label: '生词本', icon: BookMarked },
   { to: '/stats', label: '学习统计', icon: Activity },
+  { to: '/library', label: '素材库', icon: LibraryBig },
   { to: '/settings', label: '设置', icon: Settings2 }
 ]
 

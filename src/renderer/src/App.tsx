@@ -63,7 +63,7 @@ function Shell(): ReactElement {
       />
       <main className="app-main">
         <Routes>
-          <Route path="/" element={<Navigate to="/library" replace />} />
+          <Route path="/" element={<Navigate to="/plan" replace />} />
           <Route path="/library" element={<LibraryPage />} />
           <Route path="/plan" element={<PlanPage />} />
           <Route
@@ -83,7 +83,7 @@ function Shell(): ReactElement {
           <Route path="/words" element={<WordsPage />} />
           <Route path="/stats" element={<StatsPage />} />
           <Route path="/settings" element={<SettingsPage />} />
-          <Route path="*" element={<Navigate to="/library" replace />} />
+          <Route path="*" element={<Navigate to="/plan" replace />} />
         </Routes>
       </main>
       {notesOpen ? <NotesPanel onClose={() => setNotesOpen(false)} /> : null}
