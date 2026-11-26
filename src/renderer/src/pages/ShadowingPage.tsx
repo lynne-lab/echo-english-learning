@@ -785,7 +785,7 @@ export default function ShadowingPage(): ReactElement {
   return (
     <div className="page shadow-page">
       <header className="shadow-header">
-        <Link to={`/player/${material.id}`} className="btn-icon" title="返回精听">
+        <Link to="/shadowing" className="btn-icon" title="返回跟读首页">
           <ArrowLeft size={19} />
         </Link>
         <div className="shadow-header-title">
