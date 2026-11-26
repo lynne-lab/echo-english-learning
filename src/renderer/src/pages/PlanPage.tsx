@@ -39,6 +39,14 @@ const TASK_ICONS: Record<PlanTaskKind, typeof Repeat2> = {
   shadowing: Mic
 }
 
+// 「开始」统一进入对应功能首页，由用户自己选素材，而不是直接跳到某个素材。
+const TASK_ROUTES: Record<PlanTaskKind, string> = {
+  review: '/review',
+  listening: '/listening',
+  dictation: '/dictation',
+  shadowing: '/shadowing'
+}
+
 function statusLabel(status: string): string {
   if (status === 'ready') return '已就绪'
   if (status === 'processing') return '转写中'
@@ -336,7 +344,7 @@ function ActivePlan({
                     </div>
                     <p>{task.description}</p>
                   </div>
-                  <Link className="btn btn-small plan-task-action" to={task.route}>
+                  <Link className="btn btn-small plan-task-action" to={TASK_ROUTES[task.kind]}>
                     {task.action_label} <ArrowRight size={13} />
                   </Link>
                 </div>
