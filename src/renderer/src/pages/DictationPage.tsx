@@ -451,6 +451,21 @@ export default function DictationPage(): ReactElement {
     setAudioTime(next)
   }
 
+  const seekBy = (delta: number): void => {
+    const audio = audioRef.current
+    if (!audio) return
+    seekWithinSentence(audio.currentTime + delta)
+    // Paused learners usually jump to hear a specific spot right away;
+    // resume playback so the button works without a second play click.
+    if (audio.paused) {
+      audio.playbackRate = speed
+      void audio
+        .play()
+        .then(() => setAudioPlaying(true))
+        .catch(() => setAudioPlaying(false))
+    }
+  }
+
   const handleTimeUpdate = (): void => {
     const audio = audioRef.current
     if (!audio) return
@@ -951,6 +966,15 @@ export default function DictationPage(): ReactElement {
               <span className="dictation-seek-time">
                 {formatDuration(segmentTime)}
               </span>
+              <button
+                type="button"
+                className="dictation-seek-btn"
+                onClick={() => seekBy(-2)}
+                title="后退 2 秒"
+                aria-label="后退 2 秒"
+              >
+                −2s
+              </button>
               <input
                 className="seek-bar dictation-seek-bar"
                 type="range"
@@ -965,6 +989,15 @@ export default function DictationPage(): ReactElement {
                 title="拖动进度条可回听句子中的任意片段"
                 aria-label="本句播放进度"
               />
+              <button
+                type="button"
+                className="dictation-seek-btn"
+                onClick={() => seekBy(2)}
+                title="前进 2 秒"
+                aria-label="前进 2 秒"
+              >
+                +2s
+              </button>
               <span className="dictation-seek-time">
                 {formatDuration(segmentLength)}
               </span>
