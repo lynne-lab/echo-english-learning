@@ -1,5 +1,8 @@
 import type {
   AppSettings,
+  Conversation,
+  ConversationSummary,
+  ConversationTurn,
   DictationGrade,
   DictationMode,
   DictationProgress,
@@ -22,8 +25,10 @@ import type {
   Sentence,
   ShadowArchive,
   ShadowCoverage,
+  DrillResult,
   ShadowReview,
   ShadowReviewSummary,
+  TalkMeta,
   Stats,
   StudyPlanResponse,
   WordEntry
@@ -250,6 +255,44 @@ export const api = {
     request<{ ok: boolean }>(
       `/api/shadowing/reviews/${encodeURIComponent(reviewId)}`,
       { method: 'DELETE' }
+    ),
+
+  talkMeta: () => request<TalkMeta>('/api/conversations/scenarios'),
+  conversations: () => request<ConversationSummary[]>('/api/conversations'),
+  conversation: (id: string) =>
+    request<Conversation>(`/api/conversations/${encodeURIComponent(id)}`),
+  createConversation: (scenario: string, level: string, voice: string) =>
+    request<Conversation>('/api/conversations', {
+      method: 'POST',
+      body: JSON.stringify({ scenario, level, voice })
+    }),
+  deleteConversation: (id: string) =>
+    request<{ ok: boolean }>(`/api/conversations/${encodeURIComponent(id)}`, {
+      method: 'DELETE'
+    }),
+  conversationTurn: (id: string, formData: FormData) =>
+    uploadRequest<{
+      user_turn: ConversationTurn
+      assistant_turn: ConversationTurn
+    }>(`/api/conversations/${encodeURIComponent(id)}/turn`, formData),
+  conversationHint: (id: string) =>
+    request<{ hint: ConversationTurn }>(
+      `/api/conversations/${encodeURIComponent(id)}/hint`,
+      { method: 'POST' }
+    ),
+  finishConversation: (id: string) =>
+    request<Conversation>(
+      `/api/conversations/${encodeURIComponent(id)}/finish`,
+      { method: 'POST' }
+    ),
+  conversationTurnAudioUrl: (id: string, turnId: string) =>
+    `${API_BASE}/api/conversations/${encodeURIComponent(id)}/turns/${encodeURIComponent(turnId)}/audio`,
+  conversationTtsUrl: (id: string, text: string) =>
+    `${API_BASE}/api/conversations/${encodeURIComponent(id)}/tts?text=${encodeURIComponent(text)}`,
+  conversationDrill: (id: string, formData: FormData) =>
+    uploadRequest<DrillResult>(
+      `/api/conversations/${encodeURIComponent(id)}/drill`,
+      formData
     ),
 
   progress: (module: 'player' | 'shadowing', materialId: string) =>

@@ -347,6 +347,70 @@ def transcribe_short_audio(file_path: str) -> str:
     return ""
 
 
+def transcribe_short_audio_details(file_path: str) -> dict[str, Any]:
+    """Transcribe a conversation turn and keep word-level confidence.
+
+    Low-probability words are a weak signal that the learner's pronunciation
+    may have been unclear; they are only used as hints, never as phoneme scores.
+    """
+    model_size = db.get_setting("whisper_model", "small.en") or "small.en"
+    model = _load_model(model_size)
+    for attempt in range(2):
+        try:
+            segments, _info = model.transcribe(
+                file_path,
+                language="en",
+                beam_size=5,
+                vad_filter=True,
+                condition_on_previous_text=False,
+                word_timestamps=True,
+            )
+            texts: list[str] = []
+            words: list[dict[str, Any]] = []
+            for segment in segments:
+                if segment.text:
+                    texts.append(segment.text.strip())
+                for word in getattr(segment, "words", None) or []:
+                    token = str(word.word).strip()
+                    if not token:
+                        continue
+                    try:
+                        probability = float(word.probability)
+                    except (TypeError, ValueError):
+                        probability = 1.0
+                    words.append(
+                        {
+                            "w": token,
+                            "p": round(probability, 3),
+                            "s": round(float(word.start), 3),
+                            "e": round(float(word.end), 3),
+                        }
+                    )
+            text = re.sub(r"\s+", " ", " ".join(texts)).strip()
+            weak: list[str] = []
+            for word in words:
+                token = re.sub(r"[^A-Za-z']", "", word["w"])
+                if not token or word["p"] >= 0.55:
+                    continue
+                if token.lower() not in [item.lower() for item in weak]:
+                    weak.append(token)
+            return {
+                "text": text,
+                "words": words[:300],
+                "weak_words": weak[:12],
+            }
+        except Exception as exc:
+            if attempt == 0 and runtime.get("device") == "cuda" and _is_cuda_error(exc):
+                logger.warning(
+                    "CUDA short-audio inference failed, retrying on CPU: %s", exc
+                )
+                force_cpu()
+                model = _load_model(model_size)
+                continue
+            raise
+    return {"text": "", "words": [], "weak_words": []}
+
+
 def transcribe_material(material_id: str) -> None:
     material = db.get_material(material_id)
     if not material:

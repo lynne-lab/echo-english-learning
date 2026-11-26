@@ -1,0 +1,597 @@
+/* ------------------------------------------------------------------ talk home */
+
+.talk-setup {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.talk-scenarios {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 10px;
+}
+
+.talk-scenario {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--panel-soft);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.talk-scenario:hover {
+  border-color: var(--border-strong);
+  background: var(--panel-hover);
+}
+
+.talk-scenario.active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.talk-scenario-title {
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.talk-scenario-desc {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.talk-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+}
+
+.talk-option-group {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  min-width: 220px;
+}
+
+.talk-voices {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 10px;
+}
+
+.talk-voice {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--panel-soft);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.talk-voice:hover {
+  border-color: var(--border-strong);
+}
+
+.talk-voice.active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.talk-voice span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.talk-voice strong {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.talk-voice small {
+  color: var(--muted);
+  font-size: 11.5px;
+}
+
+.talk-start {
+  align-self: flex-start;
+  margin-top: 2px;
+}
+
+.talk-history-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 28px 12px;
+  color: var(--faint);
+  text-align: center;
+}
+
+.talk-history-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.talk-history-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 4px;
+  border-top: 1px solid var(--border);
+}
+
+.talk-history-row:first-child {
+  border-top: 0;
+}
+
+.talk-history-main {
+  min-width: 0;
+}
+
+.talk-history-main h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 3px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.talk-history-main p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.talk-history-preview {
+  margin-top: 4px !important;
+  overflow: hidden;
+  color: var(--faint) !important;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.talk-history-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+/* ------------------------------------------------------------------ conversation */
+
+.talk-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.talk-header-title {
+  min-width: 0;
+  flex: 1;
+}
+
+.talk-header-title h1 {
+  margin: 2px 0 4px;
+  font-size: 22px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.talk-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.talk-chat-panel {
+  padding: 18px 20px;
+}
+
+.talk-messages {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-height: 260px;
+  max-height: calc(100vh - 390px);
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.talk-msg {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  max-width: 86%;
+}
+
+.talk-msg.user {
+  align-self: flex-end;
+  flex-direction: row-reverse;
+}
+
+.talk-msg-avatar {
+  flex-shrink: 0;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--panel-soft);
+  color: var(--muted);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.talk-msg.hint .talk-msg-avatar {
+  border-color: rgba(251, 191, 36, 0.35);
+  color: #fbbf24;
+}
+
+.talk-msg-body {
+  min-width: 0;
+}
+
+.talk-msg.user .talk-msg-body {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.talk-bubble {
+  padding: 11px 14px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  border-top-left-radius: 4px;
+  background: var(--panel-soft);
+  line-height: 1.6;
+}
+
+.talk-bubble p {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.talk-msg.user .talk-bubble {
+  border-color: rgba(94, 234, 212, 0.25);
+  border-radius: 14px;
+  border-top-right-radius: 4px;
+  background: var(--accent-soft);
+}
+
+.talk-msg.hint .talk-bubble {
+  border-style: dashed;
+  border-color: rgba(251, 191, 36, 0.4);
+  background: rgba(251, 191, 36, 0.06);
+}
+
+.talk-hint-translation {
+  margin-top: 6px !important;
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+.talk-msg-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.talk-play {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 0;
+  background: transparent;
+  color: var(--faint);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.talk-play:hover {
+  color: var(--accent);
+}
+
+.talk-thinking {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+.talk-hint-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.talk-composer {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 14px;
+  padding: 14px 20px;
+}
+
+.talk-mic {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 58px;
+  height: 58px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #07110f;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  box-shadow: 0 0 0 6px rgba(94, 234, 212, 0.12);
+}
+
+.talk-mic:hover {
+  transform: translateY(-1px);
+}
+
+.talk-mic:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.talk-mic.recording {
+  background: var(--danger);
+  color: #fff;
+  box-shadow: 0 0 0 6px rgba(251, 113, 133, 0.18);
+  animation: talk-pulse 1.4s ease-in-out infinite;
+}
+
+.talk-composer-info {
+  min-width: 0;
+  flex: 1;
+}
+
+.talk-composer-info strong {
+  display: block;
+  font-size: 14px;
+  margin-bottom: 2px;
+}
+
+.talk-composer-info p {
+  margin: 0;
+  color: var(--faint);
+  font-size: 12px;
+}
+
+@keyframes talk-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 6px rgba(251, 113, 133, 0.18);
+  }
+  50% {
+    box-shadow: 0 0 0 12px rgba(251, 113, 133, 0.06);
+  }
+}
+
+/* ------------------------------------------------------------------ report + drills */
+
+.talk-report {
+  padding: 20px 24px;
+}
+
+.talk-drill-panel {
+  margin-top: 14px;
+}
+
+.talk-drill-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.talk-drill-row {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 0;
+  border-top: 1px solid var(--border);
+}
+
+.talk-drill-row:first-child {
+  border-top: 0;
+  padding-top: 4px;
+}
+
+.talk-drill-main {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.talk-drill-sentence {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.talk-drill-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.talk-drill-record {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.talk-mic.drill {
+  width: 34px;
+  height: 34px;
+  box-shadow: 0 0 0 4px rgba(94, 234, 212, 0.1);
+}
+
+.talk-mic.drill.recording {
+  box-shadow: 0 0 0 4px rgba(251, 113, 133, 0.16);
+}
+
+.talk-drill-result {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--panel-soft);
+}
+
+.talk-score-row {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.talk-score {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 8px 6px;
+  border-radius: 10px;
+  background: rgba(148, 163, 184, 0.06);
+}
+
+.talk-score strong {
+  font-size: 18px;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.talk-score span {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.talk-weak {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.talk-weak-chip {
+  padding: 2px 7px;
+  border: 1px solid rgba(251, 113, 133, 0.28);
+  border-radius: 999px;
+  background: var(--danger-soft);
+  color: var(--danger);
+  font-size: 11px;
+}
+
+.talk-drill-tip {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 0;
+  color: var(--text);
+  font-size: 12.5px;
+  line-height: 1.6;
+}
+
+.talk-drill-tip svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--accent);
+}
+
+.talk-drill-recording {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: var(--accent);
+  font-size: 12px;
+}
+
+.talk-drill-error {
+  margin: 0;
+}
+
+.talk-transcript {
+  margin-top: 14px;
+}
+
+.talk-transcript summary {
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.talk-transcript-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.talk-transcript-row {
+  display: flex;
+  gap: 10px;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.talk-transcript-row p {
+  margin: 0;
+}
+
+.talk-transcript-role {
+  flex-shrink: 0;
+  min-width: 34px;
+  color: var(--faint);
+  font-size: 11.5px;
+}
+
+.talk-transcript-row.user .talk-transcript-role {
+  color: var(--accent);
+}
+
+.talk-transcript-note {
+  color: var(--muted);
+}
+
+@media (max-width: 960px) {
+  .talk-msg {
+    max-width: 95%;
+  }
+
+  .talk-score-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .talk-messages {
+    max-height: none;
+  }
+}

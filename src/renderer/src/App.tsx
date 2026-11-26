@@ -5,6 +5,7 @@ import { api } from './api'
 import NotesPanel from './components/NotesPanel'
 import Sidebar from './components/Sidebar'
 import { ToastProvider } from './components/Toast'
+import ConversationPage from './pages/ConversationPage'
 import DictationHomePage from './pages/DictationHomePage'
 import DictationPage from './pages/DictationPage'
 import LibraryPage from './pages/LibraryPage'
@@ -16,6 +17,7 @@ import SettingsPage from './pages/SettingsPage'
 import ShadowingPage from './pages/ShadowingPage'
 import ShadowingReviewPage from './pages/ShadowingReviewPage'
 import StatsPage from './pages/StatsPage'
+import TalkHomePage from './pages/TalkHomePage'
 import WordsPage from './pages/WordsPage'
 
 type EngineState = 'starting' | 'ready' | 'error'
@@ -80,6 +82,8 @@ function Shell(): ReactElement {
           <Route path="/dictation/:id" element={<DictationPage />} />
           <Route path="/shadow/:id/review" element={<ShadowingReviewPage />} />
           <Route path="/shadow/:id" element={<ShadowingPage />} />
+          <Route path="/talk" element={<TalkHomePage />} />
+          <Route path="/talk/:id" element={<ConversationPage />} />
           <Route path="/words" element={<WordsPage />} />
           <Route path="/stats" element={<StatsPage />} />
           <Route path="/settings" element={<SettingsPage />} />

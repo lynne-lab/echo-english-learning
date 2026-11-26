@@ -37,6 +37,8 @@ packages = [
     "click",
     "jinja2",
     "yaml",
+    "edge_tts",
+    "aiohttp",
 ]
 
 for package in packages:
@@ -71,6 +73,9 @@ hiddenimports += [
     "sidecar.app.shadow_review",
     "sidecar.app.shadow_review_api",
     "sidecar.app.llm",
+    "sidecar.app.conversation",
+    "sidecar.app.conversation_api",
+    "sidecar.app.tts",
     "websockets.asyncio.client",
     "websockets.legacy.client",
 ]

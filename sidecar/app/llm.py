@@ -57,19 +57,22 @@ def chat(
     max_tokens: int = 2000,
     temperature: float = 0.35,
     timeout: float = 180.0,
+    response_format: dict[str, Any] | None = None,
 ) -> str:
     if not api_key:
         raise LLMError("请先在设置页填写 AI 服务的 API Key")
     if not model:
         raise LLMError("请先在设置页填写模型名称")
 
-    payload = {
+    payload: dict[str, Any] = {
         "model": model,
         "messages": messages,
         "temperature": temperature,
         "max_tokens": max_tokens,
         "stream": False,
     }
+    if response_format:
+        payload["response_format"] = response_format
     request = urllib.request.Request(
         endpoint_for(base_url),
         data=json.dumps(payload).encode("utf-8"),

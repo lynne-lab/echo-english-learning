@@ -192,6 +192,36 @@ CREATE TABLE IF NOT EXISTS shadow_reviews (
     created_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS conversations (
+    id TEXT PRIMARY KEY,
+    scenario TEXT NOT NULL,
+    scenario_title TEXT NOT NULL DEFAULT '',
+    level TEXT NOT NULL DEFAULT 'intermediate',
+    voice TEXT NOT NULL DEFAULT 'en-US-AriaNeural',
+    model TEXT NOT NULL DEFAULT '',
+    status TEXT NOT NULL DEFAULT 'active',
+    report_markdown TEXT NOT NULL DEFAULT '',
+    report_json TEXT NOT NULL DEFAULT '{}',
+    created_at TEXT NOT NULL,
+    finished_at TEXT
+);
+
+CREATE TABLE IF NOT EXISTS conversation_turns (
+    id TEXT PRIMARY KEY,
+    conversation_id TEXT NOT NULL,
+    role TEXT NOT NULL,
+    text TEXT NOT NULL,
+    meta_json TEXT NOT NULL DEFAULT '{}',
+    audio_path TEXT,
+    duration REAL,
+    created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_conversation_turns
+    ON conversation_turns(conversation_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_conversations_created
+    ON conversations(created_at);
+
 CREATE INDEX IF NOT EXISTS idx_sentences_material ON sentences(material_id, idx);
 CREATE INDEX IF NOT EXISTS idx_occurrences_word ON word_occurrences(word_id);
 CREATE INDEX IF NOT EXISTS idx_occurrences_sentence ON word_occurrences(sentence_id);

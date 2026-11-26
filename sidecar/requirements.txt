@@ -6,3 +6,4 @@ faster-whisper>=1.1.0
 av>=11,<19
 yt-dlp>=2025.1.1
 fsrs>=6,<7
+edge-tts>=6.1.0

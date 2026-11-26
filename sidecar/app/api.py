@@ -14,6 +14,7 @@ from fastapi.responses import FileResponse, Response, StreamingResponse
 from pydantic import BaseModel, Field
 
 from . import config, db, dictionary, jobs, shadow_review, srs
+from .conversation_api import router as conversation_router
 from .dictation_api import router as dictation_router
 from .media import ALLOWED_EXTENSIONS, ffmpeg_available, probe_media
 from .module_state_api import router as module_state_router
@@ -36,7 +37,7 @@ MODEL_IDS = {model["id"] for model in WHISPER_MODELS}
 # Bump when the clip extraction logic changes so stale WAVs are ignored.
 CLIP_VERSION = 2
 
-app = FastAPI(title="Echo Sidecar", version="0.10.7")
+app = FastAPI(title="Echo Sidecar", version="0.11.1")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -52,6 +53,7 @@ app.include_router(plan_router)
 app.include_router(progress_router)
 app.include_router(module_state_router)
 app.include_router(shadow_review_router)
+app.include_router(conversation_router)
 
 
 # ---------------------------------------------------------------- 基础信息
@@ -61,7 +63,7 @@ app.include_router(shadow_review_router)
 def health() -> dict[str, Any]:
     return {
         "ok": True,
-        "version": "0.10.7",
+        "version": "0.11.1",
         "whisper_model": db.get_setting("whisper_model", "small.en"),
         "device": runtime.get("device") or "auto",
         "model_loaded": runtime.get("model"),

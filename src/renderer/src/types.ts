@@ -456,6 +456,104 @@ export interface ShadowReview extends ShadowReviewSummary {
   report_markdown: string
 }
 
+export interface TalkScenario {
+  id: string
+  title: string
+  description: string
+}
+
+export interface TalkVoice {
+  id: string
+  label: string
+  note: string
+}
+
+export interface TalkLevel {
+  id: string
+  label: string
+}
+
+export interface TalkMeta {
+  scenarios: TalkScenario[]
+  levels: TalkLevel[]
+  voices: TalkVoice[]
+  llm_configured: boolean
+}
+
+export interface ConversationTurn {
+  id: string
+  role: 'user' | 'assistant' | 'hint'
+  text: string
+  meta: {
+    chinese?: string
+    weak_words?: string[]
+    duration?: number
+    opening?: boolean
+    model?: string
+  }
+  created_at: string
+}
+
+export interface ConversationReport {
+  overall?: string
+  grammar?: Array<{ original?: string; better?: string; note?: string }>
+  expression?: Array<{ original?: string; better?: string; note?: string }>
+  pronunciation?: { summary?: string; suspected_words?: string[] }
+  fluency?: string
+  suggestions?: string[]
+  practice_sentences?: Array<{ sentence?: string; focus?: string }>
+}
+
+export interface Conversation {
+  id: string
+  scenario: string
+  scenario_title: string
+  level: string
+  voice: string
+  model: string
+  status: 'active' | 'finished'
+  report_markdown: string
+  report: ConversationReport
+  created_at: string
+  finished_at: string | null
+  turns: ConversationTurn[]
+}
+
+export interface ConversationSummary {
+  id: string
+  scenario: string
+  scenario_title: string
+  level: string
+  voice: string
+  status: 'active' | 'finished'
+  turn_count: number
+  user_turn_count: number
+  preview: string
+  created_at: string
+  finished_at: string | null
+}
+
+export interface DrillSummary {
+  provider?: string
+  overall?: number | null
+  accuracy?: number | null
+  fluency?: number | null
+  integrity?: number | null
+  weak_words: Array<{ word?: string; accuracy?: number; error?: string }>
+  weak_phonemes: Array<{
+    phoneme?: string
+    score?: number
+    word?: string
+    error?: string
+  }>
+}
+
+export interface DrillResult {
+  result: Record<string, unknown>
+  summary: DrillSummary
+  ai_tip: string | null
+}
+
 export interface AppInfo {
   version: string
   dataDir: string
