@@ -5,6 +5,7 @@ import remarkGfm from 'remark-gfm'
 import {
   AlertCircle,
   ArrowLeft,
+  Captions,
   Loader2,
   Mic,
   Pause,
@@ -65,6 +66,7 @@ export default function ConversationPage(): ReactElement {
   const [finishing, setFinishing] = useState(false)
   const [playingId, setPlayingId] = useState<string | null>(null)
   const [ttsFallback, setTtsFallback] = useState(false)
+  const [subtitlesOn, setSubtitlesOn] = useState(false)
   const [expandedDrill, setExpandedDrill] = useState<number | null>(null)
   const [drillRecording, setDrillRecording] = useState<number | null>(null)
   const [drillBusy, setDrillBusy] = useState<number | null>(null)
@@ -105,6 +107,7 @@ export default function ConversationPage(): ReactElement {
     setHintPrompt(false)
     setHintSuppressed(false)
     setPlayingId(null)
+    setSubtitlesOn(false)
     setDrillResults({})
     setExpandedDrill(null)
     api
@@ -576,6 +579,18 @@ export default function ConversationPage(): ReactElement {
         <div className="talk-header-actions">
           {active ? (
             <button
+              className={`btn btn-small talk-subtitle-toggle${
+                subtitlesOn ? ' active' : ''
+              }`}
+              onClick={() => setSubtitlesOn((value) => !value)}
+              aria-pressed={subtitlesOn}
+              title="AI 字幕默认隐藏，点这里显示或隐藏"
+            >
+              <Captions size={14} /> {subtitlesOn ? '隐藏字幕' : '显示字幕'}
+            </button>
+          ) : null}
+          {active ? (
+            <button
               className="btn btn-small btn-primary"
               onClick={() => void finish()}
               disabled={finishing || recording || uploading}
@@ -641,12 +656,27 @@ export default function ConversationPage(): ReactElement {
                     </div>
                   ) : null}
                   <div className="talk-msg-body">
-                    <div className="talk-bubble">
-                      <p>{turn.text}</p>
-                      {turn.role === 'hint' && turn.meta.chinese ? (
-                        <p className="talk-hint-translation">{turn.meta.chinese}</p>
-                      ) : null}
-                    </div>
+                    {turn.role === 'assistant' && !subtitlesOn ? (
+                      <div className="talk-bubble talk-bubble-hidden">
+                        <span className="talk-hidden-label">
+                          <Volume2 size={14} /> AI 语音回复
+                        </span>
+                        <button
+                          type="button"
+                          className="talk-reveal"
+                          onClick={() => setSubtitlesOn(true)}
+                        >
+                          显示字幕
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="talk-bubble">
+                        <p>{turn.text}</p>
+                        {turn.role === 'hint' && turn.meta.chinese ? (
+                          <p className="talk-hint-translation">{turn.meta.chinese}</p>
+                        ) : null}
+                      </div>
+                    )}
                     <div className="talk-msg-actions">
                       <button
                         className="talk-play"

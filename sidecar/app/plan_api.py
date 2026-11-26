@@ -12,7 +12,7 @@ from . import db
 router = APIRouter(prefix="/api/plan", tags=["plan"])
 
 PLAN_DAYS = 24 * 7
-TASK_KINDS = ("review", "listening", "dictation", "shadowing")
+TASK_KINDS = ("review", "listening", "dictation", "shadowing", "conversation")
 WEEKDAY_LABELS = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"]
 
 TASKS = [
@@ -40,6 +40,12 @@ TASKS = [
         "minutes": 10,
         "description": "选 3–5 句录音，A/B 对比节奏、重音和停顿。",
     },
+    {
+        "kind": "conversation",
+        "title": "口语对话",
+        "minutes": 10,
+        "description": "和 AI 聊 3–5 个回合，结束看语法、表达和发音复盘。",
+    },
 ]
 
 PHASES: list[dict[str, Any]] = [
@@ -50,7 +56,7 @@ PHASES: list[dict[str, Any]] = [
         "start_week": 1,
         "end_week": 4,
         "accent": "美音主线，英音泛听",
-        "focus": "重新打开耳朵，建立每天 35 分钟的节奏。",
+        "focus": "重新打开耳朵，建立每天 45 分钟的节奏。",
         "goal": "0.75–1x 听懂 6 Minute English / VOA，默写准确率到 70%。",
         "materials": [
             {
@@ -329,6 +335,9 @@ def _task_payload(
     definition = next(task for task in TASKS if task["kind"] == kind)
     if kind == "review":
         route = "/review"
+        action_label = "开始"
+    elif kind == "conversation":
+        route = "/talk"
         action_label = "开始"
     elif material_id:
         route = {

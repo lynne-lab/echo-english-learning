@@ -561,7 +561,12 @@ export interface AppInfo {
   platform: string
 }
 
-export type PlanTaskKind = 'review' | 'listening' | 'dictation' | 'shadowing'
+export type PlanTaskKind =
+  | 'review'
+  | 'listening'
+  | 'dictation'
+  | 'shadowing'
+  | 'conversation'
 
 export interface PlanCatalogItem {
   title: string

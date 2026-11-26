@@ -12,6 +12,7 @@ import {
   Headphones,
   LibraryBig,
   Loader2,
+  MessageCircle,
   Mic,
   PenLine,
   Play,
@@ -36,7 +37,8 @@ const TASK_ICONS: Record<PlanTaskKind, typeof Repeat2> = {
   review: Repeat2,
   listening: Headphones,
   dictation: PenLine,
-  shadowing: Mic
+  shadowing: Mic,
+  conversation: MessageCircle
 }
 
 // 「开始」统一进入对应功能首页，由用户自己选素材，而不是直接跳到某个素材。
@@ -44,7 +46,8 @@ const TASK_ROUTES: Record<PlanTaskKind, string> = {
   review: '/review',
   listening: '/listening',
   dictation: '/dictation',
-  shadowing: '/shadowing'
+  shadowing: '/shadowing',
+  conversation: '/talk'
 }
 
 function statusLabel(status: string): string {
@@ -129,7 +132,7 @@ function StartPlan({
           <CalendarRange size={28} />
         </div>
         <div>
-          <div className="eyebrow">24 WEEKS · 35 MIN / DAY</div>
+          <div className="eyebrow">24 WEEKS · 45 MIN / DAY</div>
           <h2>把“每天练一点”变成可执行的节奏</h2>
           <p>
             三个阶段从恢复听力到真实语速。计划只负责安排任务，具体素材可以随时换成你喜欢的。
@@ -182,15 +185,15 @@ function StartPlan({
 
         <p className="hint">
           还没有素材？先到 <Link to="/library">素材库</Link> 导入 VOA、6 Minute English 或
-          ELLLO。计划开始后，每天会生成 4 个任务，大约 35 分钟。
+          ELLLO。计划开始后，每天会生成 5 个任务，大约 45 分钟。
         </p>
       </section>
 
       <section className="plan-rules">
         <div>
           <Clock size={17} />
-          <strong>每天 35 分钟</strong>
-          <span>复习 5 + 精听 10 + 默写 10 + 跟读 10</span>
+          <strong>每天 45 分钟</strong>
+          <span>复习 5 + 精听 10 + 默写 10 + 跟读 10 + 口语 10</span>
         </div>
         <div>
           <Flame size={17} />
@@ -403,7 +406,7 @@ function ActivePlan({
             <header className="section-head">
               <div>
                 <h2>最近 7 天</h2>
-                <p>每格 4 个任务</p>
+                <p>每格 5 个任务</p>
               </div>
             </header>
             <div className="plan-week">
@@ -547,7 +550,7 @@ export default function PlanPage(): ReactElement {
           <div className="eyebrow">STUDY PLAN</div>
           <h1>学习计划</h1>
           <p className="page-subtitle">
-            24 周，每天 35 分钟。计划负责节奏，Echo 负责精听、默写和跟读。
+            24 周，每天 45 分钟。计划负责节奏，Echo 负责精听、默写、跟读和口语对话。
           </p>
         </div>
         <div className="page-actions">
