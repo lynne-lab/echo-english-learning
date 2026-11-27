@@ -329,6 +329,56 @@
   padding: 0 20px;
 }
 
+.review-write {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: min(470px, 100%);
+  max-width: 100%;
+}
+
+.review-write-input {
+  flex: 1;
+  min-width: 0;
+  height: 42px;
+  padding: 0 14px;
+  border: 1px solid var(--border-strong);
+  border-radius: 12px;
+  background: rgba(9, 14, 22, 0.6);
+  color: var(--text);
+  font-size: 16px;
+  letter-spacing: 0.02em;
+  outline: none;
+}
+
+.review-write-input::placeholder {
+  color: var(--faint);
+  font-size: 13px;
+  letter-spacing: 0;
+}
+
+.review-write-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(94, 234, 212, 0.14);
+}
+
+.review-spelling {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 10px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.review-spelling.correct {
+  color: var(--accent);
+}
+
+.review-spelling.wrong {
+  color: var(--danger);
+}
+
 .rating-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));

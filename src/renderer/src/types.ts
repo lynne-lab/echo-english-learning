@@ -94,6 +94,7 @@ export interface ReviewOccurrence {
   material_title: string | null
   start: number
   end: number
+  audio_available?: boolean
 }
 
 export type ReviewStateName = 'new' | 'learning' | 'review' | 'relearning'

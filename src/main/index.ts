@@ -32,7 +32,9 @@ function createWindow(): void {
       preload: join(__dirname, '../preload/index.js'),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: false
+      sandbox: false,
+      // Review cards start their audio without a click.
+      autoplayPolicy: 'no-user-gesture-required'
     }
   })
 

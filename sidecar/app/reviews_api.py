@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
@@ -80,7 +81,8 @@ def _occurrences(conn: Any, word_ids: list[str]) -> dict[str, dict[str, Any]]:
     rows = conn.execute(
         f"""
         SELECT o.word_id, o.context, o.surface, o.material_id,
-               s.start, s.end, m.title AS material_title
+               s.start, s.end, m.title AS material_title,
+               m.file_path AS material_file
         FROM word_occurrences o
         JOIN sentences s ON s.id = o.sentence_id
         LEFT JOIN materials m ON m.id = o.material_id
@@ -91,7 +93,12 @@ def _occurrences(conn: Any, word_ids: list[str]) -> dict[str, dict[str, Any]]:
     ).fetchall()
     result: dict[str, dict[str, Any]] = {}
     for row in rows:
-        result.setdefault(row["word_id"], dict(row))
+        item = dict(row)
+        material_file = item.pop("material_file", None)
+        # The material (or only its media file) may be gone while the card
+        # stays in the queue; the client then falls back to the word audio.
+        item["audio_available"] = bool(material_file) and Path(material_file).is_file()
+        result.setdefault(row["word_id"], item)
     return result
 
 

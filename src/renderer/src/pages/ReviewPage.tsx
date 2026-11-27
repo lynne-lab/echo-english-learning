@@ -11,17 +11,19 @@ import { Link } from 'react-router-dom'
 import {
   AlertCircle,
   BookOpen,
+  Check,
   Loader2,
   Pause,
   Play,
   RefreshCw,
   Sparkles,
-  Volume2
+  Volume2,
+  X
 } from 'lucide-react'
 import { api, mediaUrl } from '../api'
 import { useToast } from '../components/Toast'
 import type { ReviewCard, ReviewSummary } from '../types'
-import { errorMessage, speakWord } from '../utils'
+import { errorMessage, speakWord, stripWord } from '../utils'
 
 const STATE_LABELS: Record<string, string> = {
   new: '新词',
@@ -73,10 +75,12 @@ export default function ReviewPage(): ReactElement {
   const [submitting, setSubmitting] = useState(false)
   const [sessionRatings, setSessionRatings] = useState<number[]>([])
   const [playing, setPlaying] = useState(false)
+  const [typed, setTyped] = useState('')
 
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const stopAtRef = useRef<number | null>(null)
   const startedAtRef = useRef(Date.now())
+  const autoPlayedRef = useRef<string | null>(null)
 
   const current = cards[index] ?? null
   const done = index >= cards.length
@@ -152,6 +156,7 @@ export default function ReviewPage(): ReactElement {
     if (audio) audio.pause()
     setPlaying(false)
     stopAtRef.current = null
+    setTyped('')
   }, [current?.word_id])
 
   useEffect(() => {
@@ -171,32 +176,65 @@ export default function ReviewPage(): ReactElement {
     return map
   }, [previews])
 
-  const toggleAudio = useCallback((): void => {
-    const audio = audioRef.current
-    const occurrence = current?.occurrence
-    if (!audio || !occurrence) return
-    if (playing) {
-      audio.pause()
-      setPlaying(false)
-      return
-    }
-    const target = mediaUrl(occurrence.material_id)
-    stopAtRef.current = occurrence.end
-    const startPlayback = (): void => {
-      audio.currentTime = occurrence.start
-      void audio
-        .play()
-        .then(() => setPlaying(true))
-        .catch(() => setPlaying(false))
-    }
-    if (audio.src !== target) {
-      audio.src = target
-      audio.onloadedmetadata = startPlayback
-      audio.load()
-    } else {
-      startPlayback()
-    }
-  }, [current, playing])
+  const playWord = useCallback((card: ReviewCard | null): void => {
+    if (!card) return
+    speakWord(card.occurrence?.surface || card.lemma)
+  }, [])
+
+  const playCurrent = useCallback(
+    (allowPause: boolean): void => {
+      const audio = audioRef.current
+      const card = current
+      if (!audio || !card) return
+      const occurrence = card.occurrence
+      // No sentence left (material deleted) or its media file is gone: read
+      // the word itself instead of failing silently.
+      if (!occurrence || occurrence.audio_available === false) {
+        playWord(card)
+        return
+      }
+      if (allowPause && playing) {
+        audio.pause()
+        setPlaying(false)
+        stopAtRef.current = null
+        return
+      }
+      const target = mediaUrl(occurrence.material_id)
+      stopAtRef.current = occurrence.end
+      const startPlayback = (): void => {
+        // The card changed (or playback was stopped) while the media loaded.
+        if (stopAtRef.current !== occurrence.end) return
+        audio.currentTime = occurrence.start
+        void audio
+          .play()
+          .then(() => setPlaying(true))
+          .catch(() => {
+            setPlaying(false)
+            stopAtRef.current = null
+            playWord(card)
+          })
+      }
+      if (audio.src !== target) {
+        audio.src = target
+        audio.onloadedmetadata = startPlayback
+        audio.load()
+      } else {
+        startPlayback()
+      }
+    },
+    [current, playing, playWord]
+  )
+
+  // Play the sentence (or the word) automatically for every new card, so the
+  // learner never has to click play first.
+  useEffect(() => {
+    if (loading || !current) return
+    const key = `${index}:${current.word_id}`
+    if (autoPlayedRef.current === key) return
+    autoPlayedRef.current = key
+    const timer = window.setTimeout(() => playCurrent(false), 160)
+    return () => window.clearTimeout(timer)
+  }, [loading, index, current?.word_id, playCurrent])
 
   const handleAudioTimeUpdate = (): void => {
     const audio = audioRef.current
@@ -206,6 +244,13 @@ export default function ReviewPage(): ReactElement {
       stopAtRef.current = null
       setPlaying(false)
     }
+  }
+
+  const handleAudioError = (): void => {
+    if (stopAtRef.current === null) return
+    stopAtRef.current = null
+    setPlaying(false)
+    playWord(current)
   }
 
   const rate = useCallback(
@@ -252,14 +297,14 @@ export default function ReviewPage(): ReactElement {
         event.preventDefault()
         if (!revealed) setRevealed(true)
       } else if (event.code === 'KeyR') {
-        toggleAudio()
+        playCurrent(true)
       } else if (revealed && /^Digit[1-4]$/.test(event.code)) {
         void rate(Number(event.code.slice(-1)))
       }
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [current, revealed, rate, toggleAudio])
+  }, [current, revealed, rate, playCurrent])
 
   if (loading) {
     return (
@@ -359,9 +404,19 @@ export default function ReviewPage(): ReactElement {
 
   const occurrence = current.occurrence
   const word = occurrence?.surface || current.lemma
+  const sentenceAudio = Boolean(occurrence && occurrence.audio_available !== false)
   const maskedText = occurrence ? maskWord(occurrence.context, word) : null
   const maskFailed = occurrence ? maskedText === occurrence.context : false
+  const hasTyped = typed.trim().length > 0
+  const spellingCorrect =
+    hasTyped && stripWord(typed).toLowerCase() === stripWord(word).toLowerCase()
   const progress = cards.length > 0 ? (index / cards.length) * 100 : 0
+
+  const revealAnswer = (): void => {
+    setRevealed(true)
+    const active = document.activeElement
+    if (active instanceof HTMLElement) active.blur()
+  }
 
   return (
     <div className="page review-page">
@@ -399,28 +454,50 @@ export default function ReviewPage(): ReactElement {
         <div className="review-listen">
           <button
             className="review-play-button"
-            onClick={toggleAudio}
-            disabled={!occurrence}
-            title={playing ? '暂停原句' : '播放原句 (R)'}
+            onClick={() => playCurrent(true)}
+            title={
+              playing ? '暂停' : sentenceAudio ? '播放原句 (R)' : '播放单词发音 (R)'
+            }
           >
             {playing ? <Pause size={20} /> : <Play size={20} />}
           </button>
           <div className="review-listen-body">
             <span className="review-kicker">
-              听原句{occurrence?.material_title ? ` · ${occurrence.material_title}` : ''}
+              {sentenceAudio ? '听原句' : '听单词'}
+              {sentenceAudio && occurrence?.material_title
+                ? ` · ${occurrence.material_title}`
+                : ''}
             </span>
             {occurrence ? (
               <p className={`review-context${!revealed && maskFailed ? ' blurred' : ''}`}>
                 {revealed ? occurrence.context : maskedText}
               </p>
             ) : (
-              <p className="review-context muted">这个词没有关联原句，仍然可以复习。</p>
+              <p className="review-context muted">
+                这个词没有关联原句，改为播放单词发音。
+              </p>
             )}
+            {occurrence && !sentenceAudio ? (
+              <span className="review-source">原句音频不可用，改为播放单词发音。</span>
+            ) : null}
           </div>
         </div>
 
         {revealed ? (
           <div className="review-answer">
+            {hasTyped ? (
+              <p className={`review-spelling ${spellingCorrect ? 'correct' : 'wrong'}`}>
+                {spellingCorrect ? (
+                  <>
+                    <Check size={15} /> 拼写正确
+                  </>
+                ) : (
+                  <>
+                    <X size={15} /> 你写的是“{typed.trim()}”，正确拼写是“{word}”
+                  </>
+                )}
+              </p>
+            ) : null}
             <div className="review-word-row">
               <h2>{word}</h2>
               {current.phonetic ? (
@@ -458,16 +535,32 @@ export default function ReviewPage(): ReactElement {
         ) : (
           <div className="review-hidden">
             <div className="review-question-mark">?</div>
-            <p>听句子，回忆这个单词</p>
-            <button
-              className="btn btn-primary"
-              onClick={(event) => {
-                event.currentTarget.blur()
-                setRevealed(true)
+            <p>
+              {sentenceAudio ? '听句子，回忆这个单词' : '听单词，回忆它的拼写'}
+              <br />
+              也可以把听到的单词写下来，回车核对
+            </p>
+            <form
+              className="review-write"
+              onSubmit={(event) => {
+                event.preventDefault()
+                revealAnswer()
               }}
             >
-              显示答案 <kbd>Space</kbd>
-            </button>
+              <input
+                className="review-write-input"
+                value={typed}
+                onChange={(event) => setTyped(event.target.value)}
+                placeholder="在这里写单词"
+                spellCheck={false}
+                autoComplete="off"
+                autoCorrect="off"
+                autoCapitalize="off"
+              />
+              <button type="submit" className="btn btn-primary">
+                显示答案 <kbd>Space</kbd>
+              </button>
+            </form>
           </div>
         )}
 
@@ -500,13 +593,14 @@ export default function ReviewPage(): ReactElement {
       <div className="review-footer-hint">
         <span><kbd>Space</kbd> 显示答案</span>
         <span><kbd>1</kbd>–<kbd>4</kbd> 评价</span>
-        <span><kbd>R</kbd> 重听原句</span>
+        <span><kbd>R</kbd> 重听音频</span>
       </div>
 
       <audio
         ref={audioRef}
         className="audio-element"
         onTimeUpdate={handleAudioTimeUpdate}
+        onError={handleAudioError}
         onEnded={() => {
           setPlaying(false)
           stopAtRef.current = null
