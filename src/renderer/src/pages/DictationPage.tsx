@@ -10,6 +10,7 @@ import {
   AlertCircle,
   ArrowLeft,
   Check,
+  ChevronDown,
   ChevronRight,
   Film,
   Loader2,
@@ -43,6 +44,14 @@ const COUNT_OPTIONS = [
   { value: 20, label: '20 句' },
   { value: 0, label: '全部' }
 ]
+
+// Reveal nothing about a sentence that has not been dictated yet: one row of
+// asterisks per word keeps the menu readable without leaking any letters.
+function maskSentence(text: string): string {
+  const words = text.split(/\s+/).filter(Boolean)
+  if (words.length === 0) return '****'
+  return words.map(() => '****').join(' ')
+}
 
 function GradePanel({
   grade,
@@ -174,6 +183,7 @@ export default function DictationPage(): ReactElement {
   const [audioTime, setAudioTime] = useState(0)
   const [clipDuration, setClipDuration] = useState(0)
   const [speed, setSpeed] = useState(1)
+  const [jumpOpen, setJumpOpen] = useState(false)
 
   const [selectedWord, setSelectedWord] = useState<{
     word: string
@@ -185,6 +195,8 @@ export default function DictationPage(): ReactElement {
   const [wordAdding, setWordAdding] = useState(false)
 
   const audioRef = useRef<HTMLAudioElement | null>(null)
+  const jumpRef = useRef<HTMLDivElement | null>(null)
+  const jumpMenuRef = useRef<HTMLDivElement | null>(null)
   const lookupSeqRef = useRef(0)
   const manualStartRef = useRef(false)
   const positionRef = useRef<{
@@ -194,6 +206,10 @@ export default function DictationPage(): ReactElement {
   } | null>(null)
 
   const currentItem = session?.items[index] ?? null
+  const completedSentenceIds = useMemo(
+    () => new Set(attempts.map((attempt) => attempt.item.sentence_id)),
+    [attempts]
+  )
 
   useEffect(() => {
     if (phase !== 'setup' || !material) return
@@ -352,6 +368,37 @@ export default function DictationPage(): ReactElement {
         .catch(() => undefined)
     }
   }, [])
+
+  useEffect(() => {
+    if (!jumpOpen) return
+    const handlePointer = (event: MouseEvent): void => {
+      if (!jumpRef.current?.contains(event.target as Node)) setJumpOpen(false)
+    }
+    const handleKey = (event: KeyboardEvent): void => {
+      if (event.key === 'Escape') setJumpOpen(false)
+    }
+    document.addEventListener('mousedown', handlePointer)
+    document.addEventListener('keydown', handleKey)
+    return () => {
+      document.removeEventListener('mousedown', handlePointer)
+      document.removeEventListener('keydown', handleKey)
+    }
+  }, [jumpOpen])
+
+  useEffect(() => {
+    // Long sessions have 100+ rows: open the menu around the current sentence
+    // instead of always at the top.
+    if (!jumpOpen) return
+    const menu = jumpMenuRef.current
+    const active = menu?.querySelector<HTMLElement>(
+      '.sentence-jump-option.active'
+    )
+    if (!menu || !active) return
+    menu.scrollTop = Math.max(
+      0,
+      active.offsetTop - menu.clientHeight / 2 + active.clientHeight / 2
+    )
+  }, [jumpOpen])
 
   useEffect(() => {
     if (phase !== 'session' || !currentItem) return
@@ -910,18 +957,53 @@ export default function DictationPage(): ReactElement {
           <div className="player-meta">
             <span>{mode === 'full' ? '整句默写' : '抠词默写'}</span>
             <span className="dot-separator">·</span>
-            <select
-              className="sentence-jump"
-              value={index}
-              onChange={(event) => jumpTo(Number(event.target.value))}
-              title="跳到指定句子"
-            >
-              {session.items.map((item, itemIndex) => (
-                <option key={item.sentence_id} value={itemIndex}>
-                  第 {itemIndex + 1} / {session.items.length} 句
-                </option>
-              ))}
-            </select>
+            <div className="sentence-jump-wrap" ref={jumpRef}>
+              <button
+                type="button"
+                className={`sentence-jump-trigger${jumpOpen ? ' open' : ''}`}
+                onClick={() => setJumpOpen((value) => !value)}
+                title="跳到指定句子"
+                aria-haspopup="listbox"
+                aria-expanded={jumpOpen}
+              >
+                第 {index + 1} / {session.items.length} 句
+                <ChevronDown size={13} />
+              </button>
+              {jumpOpen ? (
+                <div
+                  className="sentence-jump-menu"
+                  role="listbox"
+                  aria-label="跳到指定句子"
+                  ref={jumpMenuRef}
+                >
+                  {session.items.map((item, itemIndex) => {
+                    const done = completedSentenceIds.has(item.sentence_id)
+                    return (
+                      <button
+                        key={item.sentence_id}
+                        type="button"
+                        role="option"
+                        aria-selected={itemIndex === index}
+                        className={`sentence-jump-option${
+                          itemIndex === index ? ' active' : ''
+                        }${done ? ' done' : ' locked'}`}
+                        onClick={() => {
+                          setJumpOpen(false)
+                          jumpTo(itemIndex)
+                        }}
+                      >
+                        <span className="sentence-jump-index">
+                          第 {itemIndex + 1} 句
+                        </span>
+                        <span className="sentence-jump-text">
+                          {done ? item.text : maskSentence(item.text)}
+                        </span>
+                      </button>
+                    )
+                  })}
+                </div>
+              ) : null}
+            </div>
           </div>
         </div>
         <div className="dictation-header-progress">
