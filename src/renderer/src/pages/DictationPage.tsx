@@ -918,8 +918,7 @@ export default function DictationPage(): ReactElement {
             >
               {session.items.map((item, itemIndex) => (
                 <option key={item.sentence_id} value={itemIndex}>
-                  第 {itemIndex + 1} / {session.items.length} 句 ·{' '}
-                  {item.text.slice(0, 32)}
+                  第 {itemIndex + 1} / {session.items.length} 句
                 </option>
               ))}
             </select>
